@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Avg Stats — Cubetools</title>
+  <meta name="description" content="Get stats for your session. Calculate best single and any rolling averages; count DNFs, +2s, and time distributions.">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/stats/">
+  <meta property="og:title" content="Avg Stats — Cubetools">
+  <meta property="og:description" content="Get stats for your session. Calculate best single and any rolling averages; count DNFs, +2s, and time distributions.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/stats/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Avg Stats — Cubetools">
+  <meta name="twitter:description" content="Get stats for your session. Calculate best single and any rolling averages; count DNFs, +2s, and time distributions.">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    /* whole-page scroll — override split's fixed viewport height */
+    .split { height: auto; }
+    .panel { overflow-y: visible; }
+
+    /* textarea override (style.css defaults to resize:vertical) */
+    #pasteArea { field-sizing:content;resize:none;min-height:8lh; }
+
+    /* config layout */
+    .config-row { display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end; }
+    .config-item { display:flex;flex-direction:column;gap:4px; }
+    .config-item input[type="number"],
+    .config-item input[type="text"] { width:80px; }
+
+    /* recommend button */
+    .btn-recommend {
+      align-self:flex-end;padding:9px 10px;
+      font-family:var(--font-mono);
+      font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+      background:var(--surface-2);color:var(--text-dim);
+      border:1px solid var(--border-2);border-radius:var(--radius);
+      cursor:pointer;white-space:nowrap;
+      transition:color .15s,border-color .15s;
+    }
+    .btn-recommend:hover { color:var(--accent);border-color:var(--accent); }
+
+    /* output */
+    .output-cols { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
+    .out-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px; }
+    .out-card h3 { font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text-muted);margin-bottom:10px; }
+    .stat-line { display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border); }
+    .stat-line:last-child { border-bottom:none; }
+    .stat-line-key { font-size:0.82rem;color:var(--text); }
+    .stat-line-val { font-family:var(--font-mono);font-size:0.88rem;color:var(--text); }
+    .stat-line-val.hi { color:var(--accent); }
+
+    /* copy button */
+    #btnCopy { width:100%;justify-content:center;margin-bottom:10px;transition:color .15s,border-color .15s; }
+    #btnCopy.flash { color:#4a9e6b !important;border-color:#4a9e6b !important; }
+    #resetBtn { margin-bottom: 10px; width: 100%; justify-content: center; }
+
+    @media(max-width:700px){ .output-cols { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="page">
+  <div class="split">
+
+    <!-- ── LEFT: inputs ── -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Avg Stats</div>
+        <div class="panel-sub">generate stats from a session</div>
+      </div>
+
+      <button class="btn btn-ghost" id="resetBtn">↺ Reset <kbd>Shift+Esc</kbd></button>
+
+      <div class="input-group">
+        <label class="label" for="pasteArea">input</label>
+        <textarea id="pasteArea" placeholder="your FULL cstimer average, or a comma-separated list of solves"></textarea>
+        <div id="formatBadge" class="format-badge" style="display:none">Invalid input — paste a cstimer average or comma-separated times of AT LEAST 3 solves.</div>
+      </div>
+
+      <div id="configZone" style="opacity:.35;pointer-events:none">
+
+        <div class="divider"></div>
+        <div class="input-group">
+          <span class="label">+2s</span>
+          <div class="config-row">
+            <div class="config-item" style="align-self:flex-start">
+              <label class="label" style="display:flex;align-items:center;gap:4px">Track +2s
+                <span class="tooltip-wrap"><span class="tooltip-q">?</span>
+                  <span class="tooltip-box">Enable to see total +2s, un-+2'd average, and how many +2s fall in each cut range.</span>
+                </span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="p2Toggle" checked>
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="input-group">
+          <span class="label">time cuts (e.g. 1:00.10)</span>
+          <div class="config-row">
+            <div class="config-item">
+              <label class="label" for="cut1">Cut 1
+                <span class="tooltip-wrap"><span class="tooltip-q">?</span>
+                  <span class="tooltip-box">I recommend cut 1 to be the fastest solve in your average.</span>
+                </span>
+              </label>
+              <input type="text" id="cut1" placeholder="e.g. 8">
+            </div>
+            <div class="config-item">
+              <label class="label" for="cut2">Cut 2
+                <span class="tooltip-wrap"><span class="tooltip-q">?</span>
+                  <span class="tooltip-box">I recommend cut 2 to be something between cut 1 and cut 3, but up to you where you put them.</span>
+                </span>
+              </label>
+              <input type="text" id="cut2" placeholder="e.g. 10">
+            </div>
+            <div class="config-item">
+              <label class="label" for="cut3">Cut 3
+                <span class="tooltip-wrap"><span class="tooltip-q">?</span>
+                  <span class="tooltip-box">I recommend cut 3 to be the fastest time you would consider "bad".</span>
+                </span>
+              </label>
+              <input type="text" id="cut3" placeholder="e.g. 1:03">
+            </div>
+            <button class="btn-recommend" id="btnRecommend">
+              Use recommended
+              <span class="tooltip-wrap"><span class="tooltip-q">?</span>
+                <span class="tooltip-box">Click to auto-fill cuts based on your average.</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="input-group">
+          <span class="label">rolling averages</span>
+          <div class="config-row">
+            <div class="config-item">
+              <label class="label" for="avg1">Avg 1
+                <span class="tooltip-wrap"><span class="tooltip-q">?</span>
+                  <span class="tooltip-box">Length of the first rolling average to find best of (e.g. 5 for best rolling ao5).</span>
+                </span>
+              </label>
+              <input type="number" id="avg1" value="5" min="3">
+            </div>
+            <div class="config-item">
+              <label class="label" for="avg2">Avg 2
+                <span class="tooltip-wrap"><span class="tooltip-q">?</span>
+                  <span class="tooltip-box">Length of the second rolling average to find best of (e.g. 12 for best rolling ao12).</span>
+                </span>
+              </label>
+              <input type="number" id="avg2" value="12" min="3">
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /configZone -->
+    </div><!-- /left panel -->
+
+    <!-- ── RIGHT: results ── -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot" style="background:#555"></span>Output</div>
+        <div id="resultsSub" class="panel-sub"></div>
+      </div>
+      <button class="btn btn-ghost" id="btnCopy" style="display:none">Copy results <kbd>Ctrl+C</kbd></button>
+      <div id="outputCols">
+        <p class="output-empty" id="placeholderOut">Stats will appear here.</p>
+      </div>
+    </div>
+
+  </div><!-- /split -->
+</div><!-- /page -->
+
+<script type="module">
+import { buildNav } from '../shared/nav.js';
+import {
+  noBrackets, noMultiphase, noParen, minutes, seconds,
+  ndnf, ydnf, prths, nprths, findAll, isTimeList, parsePaste,
+  frwrd, repeat, avg, avgCompare, roundDecimal, stdev, numPart, addSeconds
+} from '../shared/helpers.js';
+
+buildNav('stats');
+
+const pasteArea   = document.getElementById('pasteArea');
+const formatBadge = document.getElementById('formatBadge');
+const configZone  = document.getElementById('configZone');
+const outputCols  = document.getElementById('outputCols');
+const placeholder = document.getElementById('placeholderOut');
+const p2Toggle    = document.getElementById('p2Toggle');
+const cut1In      = document.getElementById('cut1');
+const cut2In      = document.getElementById('cut2');
+const cut3In      = document.getElementById('cut3');
+const avg1In      = document.getElementById('avg1');
+const avg2In      = document.getElementById('avg2');
+const btnRecommend= document.getElementById('btnRecommend');
+const copyBtn     = document.getElementById('btnCopy');
+const resultsSub  = document.getElementById('resultsSub');
+
+let parsed = null;
+let autoRecommended = false;
+let lastStats = null;
+let undoMode = false;
+const STORAGE_KEY = 'cube-tool-solves';
+const RESET_HTML = '↺ Reset <kbd>Shift+Esc</kbd>';
+const UNDO_HTML  = '↩ Undo <kbd>Ctrl+Z</kbd>';
+const resetBtn = document.getElementById('resetBtn');
+
+function enterUndoMode() { undoMode = true;  resetBtn.innerHTML = UNDO_HTML; }
+function exitUndoMode()  { undoMode = false; resetBtn.innerHTML = RESET_HTML; }
+
+function triggerReset() {
+  if (undoMode) return;
+  // save current content before wiping
+  localStorage.setItem(STORAGE_KEY, pasteArea.value);
+  pasteArea.value = '';
+  pasteArea.dispatchEvent(new Event('input'));
+  enterUndoMode();
+}
+function triggerUndo() {
+  if (!undoMode) return;
+  const stored = localStorage.getItem(STORAGE_KEY) ?? '';
+  pasteArea.value = stored;
+  pasteArea.dispatchEvent(new Event('input'));
+  exitUndoMode();
+}
+resetBtn.addEventListener('click', () => undoMode ? triggerUndo() : triggerReset());
+
+// ── Cut parsing ──────────────────────────────────────────────────────────────
+function parseCut(val) {
+  if (!val || !val.trim()) return 0;
+  const s = val.trim();
+  if (s.includes(':')) return minutes(s);
+  return parseFloat(s) || 0;
+}
+
+function snapToHalf(v) { return Math.round(v * 2) / 2; }
+function fmtCut(secs) { return seconds(String(secs)); }
+
+function recommendCuts(rFloat) {
+  const sorted = rFloat.filter(v => v !== 'DNF').slice().sort((a, b) => a - b);
+  if (sorted.length < 3) return null;
+  const n = sorted.length;
+  const minVal = sorted[0];
+  const cut1 = Number.isInteger(minVal) ? minVal - 1 : Math.floor(minVal);
+  const p20idx = Math.max(0, Math.ceil(n * 0.20) - 1);
+  const raw2 = Math.max(sorted[p20idx], cut1 + 0.5);
+  let cut2 = snapToHalf(raw2);
+  if (cut2 <= cut1) cut2 = snapToHalf(cut1 + 0.5);
+  const p80idx = Math.min(n - 1, Math.floor(n * 0.80));
+  const raw3 = Math.max(sorted[p80idx], cut2 + 0.5);
+  let cut3 = snapToHalf(raw3);
+  if (cut3 <= cut2) cut3 = snapToHalf(cut2 + 0.5);
+  return { cut1, cut2, cut3 };
+}
+
+function applyRecommended() {
+  if (!parsed) return;
+  const rFloat = parsed.r.map(s => s === 'DNF' ? 'DNF' : parseFloat(s));
+  const cuts = recommendCuts(rFloat);
+  if (!cuts) return;
+  cut1In.value = fmtCut(cuts.cut1);
+  cut2In.value = fmtCut(cuts.cut2);
+  cut3In.value = fmtCut(cuts.cut3);
+  compute();
+}
+
+btnRecommend.addEventListener('click', applyRecommended);
+
+// ── Parse ────────────────────────────────────────────────────────────────────
+pasteArea.addEventListener('input', () => {
+  if (!pasteArea.value) {
+    autoRecommended = false;
+    cut1In.value = '';
+    cut2In.value = '';
+    cut3In.value = '';
+    copyBtn.style.display = 'none';
+    lastStats = null;
+    localStorage.removeItem(STORAGE_KEY);
+    formatBadge.style.display = 'none';
+  }
+  parsed = parsePaste(pasteArea.value);
+  const hasContent = pasteArea.value.trim().length > 0;
+  formatBadge.style.display = (!parsed && hasContent) ? '' : 'none';
+  if (parsed) {
+    localStorage.setItem(STORAGE_KEY, parsed.timeList.map(t => {
+      let s = t; if (s.startsWith('(') && s.endsWith(')')) s = s.slice(1, -1); return s;
+    }).join(', '));
+    configZone.style.opacity = '1';
+    configZone.style.pointerEvents = '';
+    if (parsed.length >= 12 && !avg2In.dataset.touched) avg2In.value = Math.min(12, parsed.length - 1);
+    if (parsed.length < 5)  avg1In.value = '';
+    if (parsed.length < 12) avg2In.value = '';
+    if (!autoRecommended) {
+      autoRecommended = true;
+      applyRecommended();
+      return;
+    }
+    compute();
+  } else {
+    configZone.style.opacity = '.35';
+    configZone.style.pointerEvents = 'none';
+    outputCols.innerHTML = '';
+    outputCols.appendChild(placeholder);
+    resultsSub.textContent = '';
+  }
+});
+
+[p2Toggle, cut1In, cut2In, cut3In, avg1In, avg2In].forEach(el => {
+  el.addEventListener('change', () => { if (parsed) compute(); });
+  if (el.type === 'number' || el.type === 'text') el.addEventListener('input', () => { if (parsed) compute(); });
+});
+avg2In.addEventListener('input', () => avg2In.dataset.touched = '1');
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+const _stored = localStorage.getItem(STORAGE_KEY);
+if (_stored) { pasteArea.value = _stored; pasteArea.dispatchEvent(new Event('input')); }
+
+// ── Copy ─────────────────────────────────────────────────────────────────────
+let flashTimeout = null;
+
+function triggerCopy() {
+  if (!lastStats) return;
+  const {
+    length, AVG1, AVG2, PLUS_TWO, CUT3,
+    bestSingle, worstSingle, bestCounting, worstCounting, bestA1, bestA2, sdVal,
+    dnfCount, dstCount, p2Count, unP2Avg,
+    hasCuts, c1Label, c2Label, r1Str, r2Str, above, repStrs
+  } = lastStats;
+  const fmtBest = v => v === null || v === undefined ? null : (v === 'DNF' ? 'DNF' : seconds(String(v)));
+  const lines = ['## stats:', '**comments**: '];
+  lines.push(`**best single:** ${bestSingle}`);
+  lines.push(`**worst single:** ${worstSingle}`);
+  lines.push(`**best counting:** ${bestCounting}`);
+  lines.push(`**worst counting:** ${worstCounting}`);
+  if (AVG1 && bestA1 !== null) lines.push(`**best ao${AVG1}:** ${fmtBest(bestA1)}`);
+  if (AVG2 && bestA2 !== null) lines.push(`**best ao${AVG2}:** ${fmtBest(bestA2)}`);
+  lines.push(`**standard deviation:** ${sdVal}`);
+  lines.push(`**dnfs:** ${dnfCount}`);
+  lines.push(`**didnt start timer dnfs:** ${dstCount}`);
+  if (PLUS_TWO) lines.push(`**+2s:** ${p2Count}`);
+  if (PLUS_TWO && unP2Avg) lines.push(`**un+2ed ao${length}:** ${unP2Avg}`);
+  if (hasCuts) {
+    const pfx = PLUS_TWO ? '+2 to ' : '';
+    lines.push(`**${pfx}${c1Label}:** ${r1Str}`);
+    lines.push(`**${pfx}${c2Label}:** ${r2Str}`);
+    lines.push(`**${seconds(String(CUT3))}+s:** ${above}`);
+  }
+  lines.push('');
+  lines.push(`**repeats:** ${repStrs.length ? repStrs.join(', ') : 'none'}`);
+
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const old = copyBtn.innerHTML;
+    copyBtn.textContent = 'Copied!';
+    copyBtn.classList.add('flash');
+    clearTimeout(flashTimeout);
+    flashTimeout = setTimeout(() => {
+      copyBtn.innerHTML = old;
+      copyBtn.classList.remove('flash');
+    }, 1500);
+  });
+}
+
+copyBtn.addEventListener('click', triggerCopy);
+
+document.addEventListener('keydown', e => {
+  if (e.shiftKey && e.key === 'Escape') { e.preventDefault(); triggerReset(); return; }
+  if (e.ctrlKey && e.key === 'z') { if (undoMode) { e.preventDefault(); triggerUndo(); } return; }
+  if (!e.ctrlKey || e.key !== 'c' || !lastStats) return;
+  const active = document.activeElement;
+  const hasInputSel = active &&
+    (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+    active.selectionStart !== active.selectionEnd;
+  const hasTextSel = (window.getSelection()?.toString().length ?? 0) > 0;
+  if (!hasInputSel && !hasTextSel) {
+    e.preventDefault();
+    triggerCopy();
+  }
+});
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function sLine(key, val, hi = false) {
+  return `<div class="stat-line">
+    <span class="stat-line-key">${key}</span>
+    <span class="stat-line-val${hi ? ' hi' : ''}">${val ?? '—'}</span>
+  </div>`;
+}
+
+function compute() {
+  const { timeList, r, avgVal, decimals, length } = parsed;
+  const PLUS_TWO = p2Toggle.checked;
+  const CUT1 = parseCut(cut1In.value);
+  const CUT2 = parseCut(cut2In.value);
+  const CUT3 = parseCut(cut3In.value);
+  const AVG1 = parseInt(avg1In.value) || null;
+  const AVG2 = parseInt(avg2In.value) || null;
+
+  const rFloat = r.map(s => s === 'DNF' ? 'DNF' : parseFloat(s));
+  const nonDnfFloat = rFloat.filter(v => v !== 'DNF');
+
+  const allNonDnf = timeList.filter((t) => ndnf(t));
+  const bestSingle  = allNonDnf.reduce((b, s) => minutes(numPart(s)) < minutes(numPart(b)) ? s : b, allNonDnf[0] ?? '—');
+  const worstSingle = allNonDnf.reduce((b, s) => minutes(numPart(s)) > minutes(numPart(b)) ? s : b, allNonDnf[0] ?? '—');
+  const counting = timeList.filter((t) => ndnf(t) && nprths(t));
+  const bestCounting  = counting.reduce((b, s) => minutes(s) < minutes(b) ? s : b, counting[0] ?? '—');
+  const worstCounting = counting.reduce((b, s) => minutes(s) > minutes(b) ? s : b, counting[0] ?? '—');
+
+  let bestA1 = null, bestA2 = null;
+  if (AVG1 && AVG1 <= length && length - AVG1 > 0) {
+    const opts = [];
+    for (let i = 0; i <= length - AVG1; i++) opts.push(avg(frwrd(r, i, AVG1), AVG1, decimals));
+    bestA1 = opts.reduce((b, v) => avgCompare(v) < avgCompare(b) ? v : b, opts[0]);
+  }
+  if (AVG2 && AVG2 <= length && length - AVG2 > 0) {
+    const opts = [];
+    for (let i = 0; i <= length - AVG2; i++) opts.push(avg(frwrd(r, i, AVG2), AVG2, decimals));
+    bestA2 = opts.reduce((b, v) => avgCompare(v) < avgCompare(b) ? v : b, opts[0]);
+  }
+
+  const sdVal = nonDnfFloat.length > 1 ? seconds(String(stdev(nonDnfFloat).toFixed(2))) : '—';
+
+  const dnfCount = findAll(timeList, 'DNF');
+  const dstCount = findAll(timeList, decimals === 3 ? 'DNF(0.001)' : 'DNF(0.01)');
+  let p2Count = null, unP2Avg = null;
+  if (PLUS_TWO) {
+    p2Count = findAll(timeList, '+');
+    if (avgVal !== 'DNF' && p2Count > 0) {
+      // un-+2 each solve, then recompute the average from scratch so trimming
+      // re-evaluates with the corrected times (a +2 may no longer be a slow trim).
+      const unplus = timeList.map(s => {
+        if (ydnf(s)) return 'DNF';
+        if (s.includes('+')) return addSeconds(String(minutes(noParen(s).slice(0, -1))), -2);
+        return String(minutes(noParen(s)));
+      });
+      const a = avg(unplus, length, decimals);
+      unP2Avg = a === 'DNF' ? 'DNF' : seconds(String(a));
+    }
+  }
+
+  const hasCuts = CUT1 || CUT2 || CUT3;
+  const c1Label = (CUT2 - CUT1 === 1) ? seconds(String(CUT1)) : `${seconds(String(CUT1))} – ${seconds(String(CUT2))}`;
+  const c2Label = (CUT3 - CUT2 === 1) ? seconds(String(CUT2)) : `${seconds(String(CUT2))} – ${seconds(String(CUT3))}`;
+  const inR1 = rFloat.filter(v => v !== 'DNF' && v > CUT1 && v < CUT2).length;
+  const inR2 = rFloat.filter(v => v !== 'DNF' && v > CUT2 && v < CUT3).length;
+  const above = rFloat.filter(v => v !== 'DNF' && v >= CUT3).length;
+  let r1Str = String(inR1), r2Str = String(inR2);
+  if (PLUS_TWO) {
+    const p2inR1 = timeList.filter(s => s.includes('+') && (() => { const v = minutes(numPart(s)); return v > CUT1 && v < CUT2; })()).length;
+    const p2inR2 = timeList.filter(s => s.includes('+') && (() => { const v = minutes(numPart(s)); return v > CUT2 && v < CUT3; })()).length;
+    r1Str = `${p2inR1}/${inR1}`; r2Str = `${p2inR2}/${inR2}`;
+  }
+
+  const reps = repeat(rFloat);
+  const repStrs = Object.entries(reps).map(([v, c]) => `${c > 2 ? c + ' ' : ''}${v}${c > 2 ? 's' : ''}`);
+
+  lastStats = {
+    length, decimals, avgVal, AVG1, AVG2, PLUS_TWO, CUT1, CUT2, CUT3,
+    bestSingle: noParen(bestSingle), worstSingle: noParen(worstSingle),
+    bestCounting, worstCounting, bestA1, bestA2, sdVal,
+    dnfCount, dstCount, p2Count, unP2Avg,
+    hasCuts, c1Label, c2Label, r1Str, r2Str, above, repStrs
+  };
+
+  copyBtn.style.display = '';
+  resultsSub.textContent = `ao${length}: ${avgVal}`;
+
+  placeholder.remove();
+  outputCols.innerHTML = `
+    <div class="output-cols">
+      <div class="out-card">
+        <h3>Bests &amp; Worsts</h3>
+        ${sLine('Best single',    noParen(bestSingle),  true)}
+        ${sLine('Worst single',   noParen(worstSingle))}
+        ${sLine('Best counting',  bestCounting)}
+        ${sLine('Worst counting', worstCounting)}
+        ${AVG1 && bestA1 !== null ? sLine(`Best ao${AVG1}`, bestA1 === 'DNF' ? 'DNF' : bestA1 !== Number.MAX_SAFE_INTEGER ? seconds(String(bestA1)) : 'DNF', true) : ''}
+        ${AVG2 && bestA2 !== null ? sLine(`Best ao${AVG2}`, bestA2 === 'DNF' ? 'DNF' : bestA2 !== Number.MAX_SAFE_INTEGER ? seconds(String(bestA2)) : 'DNF', true) : ''}
+        ${sLine('Std deviation', sdVal)}
+      </div>
+      <div class="out-card">
+        <h3>Distribution</h3>
+        ${sLine('DNFs',                dnfCount)}
+        ${sLine("Didn't start timer",  dstCount)}
+        ${PLUS_TWO ? sLine('+2s', p2Count) : ''}
+        ${PLUS_TWO && unP2Avg ? sLine(`Un-+2'd ao${length}`, unP2Avg) : ''}
+        ${hasCuts ? sLine(`${PLUS_TWO ? '+2 to ' : ''}${c1Label}`, r1Str) : ''}
+        ${hasCuts ? sLine(`${PLUS_TWO ? '+2 to ' : ''}${c2Label}`, r2Str) : ''}
+        ${hasCuts ? sLine(`${seconds(String(CUT3))}+`, above) : ''}
+        <div class="stat-line" style="flex-direction:column;align-items:flex-start;gap:4px">
+          <span class="stat-line-key">Repeats:</span>
+          <span class="stat-line-val" style="font-size:0.82rem">${repStrs.length ? repStrs.join(', ') : 'none'}</span>
+        </div>
+      </div>
+    </div>`;
+}
+</script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Time Addition — Cubetools</title>
+  <meta name="description" content="Add together any number of times in any format, even if minutes are involved.">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/add/">
+  <meta property="og:title" content="Time Addition — Cubetools">
+  <meta property="og:description" content="Add together any number of times in any format, even if minutes are involved.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/add/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Time Addition — Cubetools">
+  <meta name="twitter:description" content="Add together any number of times in any format, even if minutes are involved.">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    .solve-list {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex: none;
+      max-height: calc(100vh - var(--nav-h) - 170px);
+      overflow-y: auto;
+    }
+
+    .solve-entry { display: flex; flex-direction: column; gap: 3px; }
+    .solve-error {
+      font-family: var(--font-mono); font-size: 0.65rem;
+      color: #d86074; padding-left: 30px;
+      display: none; align-items: center; gap: 5px;
+    }
+    .solve-error::before {
+      content: ''; display: inline-block; width: 12px; height: 11px; flex-shrink: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 18'%3E%3Cpath d='M10 2L2 16h16L10 2z' fill='none' stroke='%23d86074' stroke-width='2.8' stroke-linejoin='round'/%3E%3Crect x='9.1' y='7' width='1.8' height='5' rx='.9' fill='%23d86074'/%3E%3Ccircle cx='10' cy='14' r='1.1' fill='%23d86074'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-size: contain; background-position: center;
+    }
+    .solve-error.visible { display: flex; }
+
+    .remove-btn {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 1rem; padding: 2px 6px;
+      line-height: 1; flex-shrink: 0;
+      transition: color 0.12s;
+    }
+    .remove-btn:hover { color: #c41e3a; }
+    .remove-btn.hidden { visibility: hidden; pointer-events: none; }
+
+    .solve-field.p2-state {
+      color: #d49010;
+      border-color: #d4901066;
+    }
+    .solve-field.dnf-state {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+      text-decoration: line-through;
+    }
+    .pen-btn.dnf {
+      color: var(--accent) !important;
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
+      background: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+    }
+
+    .output-box { min-height: 0; }
+    .output-sum-str {
+      font-family: var(--font-mono); font-size: 0.8rem;
+      color: var(--text-dim); line-height: 2; word-break: break-all;
+    }
+    #copyBtn { margin-bottom: 10px; }
+    #resetBtn { margin-bottom: 10px; width: 100%; justify-content: center; }
+  </style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="page">
+  <div class="split">
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Time Addition</div>
+        <div class="panel-sub">add times under an hour together</div>
+      </div>
+      <button class="btn btn-ghost" id="resetBtn">↺ Reset <kbd>Shift+Esc</kbd></button>
+      <div id="solveList" class="solve-list"></div>
+      <div class="mt-16">
+        <button class="btn btn-ghost" id="addRowBtn">+ Add time</button>
+      </div>
+      <div class="divider"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot" style="background:#555"></span>Output</div>
+        <div class="panel-sub">your sum of times</div>
+      </div>
+      <button class="btn btn-ghost" id="copyBtn" style="display:none;justify-content:center;">Copy result <kbd>Ctrl+C</kbd></button>
+      <div class="output-box" id="outputBox">
+        <div id="emptyMsg" class="output-empty">Add more solves...</div>
+        <div id="sumDisplay" style="display:none">
+          <div class="output-big" id="sumValue">—</div>
+          <div class="output-sum-str" id="sumStr"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { buildNav } from '../shared/nav.js';
+import { minutes, seconds, addSeconds } from '../shared/helpers.js';
+buildNav('add');
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let solves = []; // { raw: string, penalty: null|'p2'|'dnf' }
+let undoMode = false;
+let suppressSave = false;
+let resetPagehideHandler = null;
+const STORAGE_KEY = 'cube-tool-solves';
+const RESET_HTML = '↺ Reset <kbd>Shift+Esc</kbd>';
+const UNDO_HTML  = '↩ Undo <kbd>Ctrl+Z</kbd>';
+
+// ── DOM ───────────────────────────────────────────────────────────────────────
+const solveList  = document.getElementById('solveList');
+const emptyMsg   = document.getElementById('emptyMsg');
+const sumDisplay = document.getElementById('sumDisplay');
+const sumValue   = document.getElementById('sumValue');
+const sumStrEl   = document.getElementById('sumStr');
+const copyBtn    = document.getElementById('copyBtn');
+const resetBtn   = document.getElementById('resetBtn');
+
+document.getElementById('addRowBtn').addEventListener('click', () => addRow(true));
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+const timeRegex     = v => /^(\d+:)?\d+(\.\d+)?$/.test(v.trim());
+const getEntries    = () => [...solveList.querySelectorAll('.solve-entry')];
+const getAllFields   = () => [...solveList.querySelectorAll('.solve-field')];
+const getEntryIndex = el => getEntries().indexOf(el.closest('.solve-entry'));
+
+function renumberRows() {
+  solveList.querySelectorAll('.solve-num').forEach((el, i) => {
+    el.textContent = (i + 1) + '.';
+  });
+}
+
+function updatePenBtns(entry, penalty) {
+  const btns = entry.querySelectorAll('.pen-btn');
+  if (!btns.length) return;
+  btns[0].classList.toggle('p2',  penalty === 'p2');
+  btns[1].classList.toggle('dnf', penalty === 'dnf');
+}
+
+function setInlineError(entry, msg) {
+  const el = entry.querySelector('.solve-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle('visible', !!msg);
+}
+
+// ── DNF input parser ──────────────────────────────────────────────────────────
+function parseDnfInput(v) {
+  if (/^dnf$/i.test(v.trim())) return { raw: '' };
+  const m = v.match(/^dnf\s*\(?([\d:.]+)\)?$/i);
+  if (m && timeRegex(m[1])) return { raw: m[1] };
+  return null;
+}
+
+// ── Visual state ──────────────────────────────────────────────────────────────
+function applyFieldDisplay(field, s) {
+  field.classList.remove('p2-state', 'dnf-state', 'ok', 'err');
+  if (s.penalty === 'p2' && s.raw) {
+    field.value = renderTimeStr(s);
+    field.classList.add('p2-state');
+  } else if (s.penalty === 'dnf') {
+    field.value = s.raw ? `DNF(${s.raw})` : 'DNF';
+    field.classList.add('dnf-state');
+  } else {
+    field.value = s.raw || '';
+  }
+}
+
+function applyPenaltyClass(field, penalty) {
+  field.classList.remove('p2-state', 'dnf-state');
+  if (penalty === 'p2')  field.classList.add('p2-state');
+  if (penalty === 'dnf') field.classList.add('dnf-state');
+}
+
+// ── Show/hide remove buttons ──────────────────────────────────────────────────
+function updateRemoveBtns() {
+  const single = solves.length <= 1;
+  solveList.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.classList.toggle('hidden', single);
+  });
+}
+
+// ── Storage & undo ────────────────────────────────────────────────────────────
+function serializeSolves() {
+  return [...solveList.querySelectorAll('.solve-field')]
+    .map(f => f.value.trim()).filter(Boolean).join(', ');
+}
+
+function saveToStorage() {
+  if (suppressSave) return;
+  if (undoMode) exitUndoMode();
+  localStorage.setItem(STORAGE_KEY, serializeSolves());
+}
+
+function enterUndoMode() {
+  undoMode = true;  resetBtn.innerHTML = UNDO_HTML;
+  resetPagehideHandler = () => localStorage.removeItem(STORAGE_KEY);
+  window.addEventListener('pagehide', resetPagehideHandler);
+}
+function exitUndoMode()  {
+  undoMode = false; resetBtn.innerHTML = RESET_HTML;
+  if (resetPagehideHandler) {
+    window.removeEventListener('pagehide', resetPagehideHandler);
+    resetPagehideHandler = null;
+  }
+}
+
+function parseSolveStr(v) {
+  v = v.trim(); if (!v) return null;
+  const d = parseDnfInput(v);
+  if (d !== null) return { raw: d.raw, penalty: 'dnf' };
+  if (v.endsWith('+')) {
+    const base = v.slice(0, -1).trim();
+    if (timeRegex(base)) {
+      const rawSeconds = minutes(base) - 2;
+      if (rawSeconds >= 0) return { raw: seconds(addSeconds(String(minutes(base)), -2)), penalty: 'p2', p2Source: 'typed' };
+    }
+  }
+  return { raw: v, penalty: null };
+}
+
+function restoreFromStorage() {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  const parts  = stored ? stored.split(',').map(p => p.trim()).filter(Boolean) : [];
+  const parsed = parts.map(parseSolveStr).filter(Boolean);
+  suppressSave = true;
+  solves = []; solveList.innerHTML = '';
+  if (parsed.length) {
+    parsed.forEach(s => { solves.push(s); solveList.appendChild(createEntryEl(solves.length - 1)); });
+    updateRemoveBtns(); recompute();
+  } else addRow(true);
+  suppressSave = false;
+}
+
+function triggerReset() {
+  if (undoMode) return;
+  suppressSave = true;
+  solves = []; solveList.innerHTML = '';
+  addRow(true);
+  suppressSave = false;
+  enterUndoMode();
+}
+
+function triggerUndo() {
+  if (!undoMode) return;
+  suppressSave = true; restoreFromStorage(); suppressSave = false;
+  exitUndoMode();
+}
+
+resetBtn.addEventListener('click', () => undoMode ? triggerUndo() : triggerReset());
+
+// ── Row creation ──────────────────────────────────────────────────────────────
+function createEntryEl(idx) {
+  const s = solves[idx];
+
+  const entry = document.createElement('div');
+  entry.className = 'solve-entry';
+
+  const row = document.createElement('div');
+  row.className = 'solve-row';
+
+  // Number
+  const num = document.createElement('div');
+  num.className = 'solve-num';
+  num.textContent = (idx + 1) + '.';
+
+  // Input
+  const fieldWrap = document.createElement('div');
+  fieldWrap.style.flex = '1';
+  const field = document.createElement('input');
+  field.type = 'text';
+  field.className = 'solve-field';
+  field.placeholder = '0:00.00';
+  applyFieldDisplay(field, s);
+  fieldWrap.appendChild(field);
+
+  field.addEventListener('input', () => {
+    const ri = getEntryIndex(field);
+    if (ri === -1) return;
+    const v = field.value;
+
+    const dnfResult = parseDnfInput(v);
+    if (dnfResult !== null) {
+      solves[ri].raw     = dnfResult.raw;
+      solves[ri].penalty = 'dnf';
+      applyPenaltyClass(field, 'dnf');
+      updatePenBtns(entry, 'dnf');
+      recompute();
+      return;
+    }
+
+    if (v.endsWith('+')) {
+      const base = v.slice(0, -1).trim();
+      if (timeRegex(base)) {
+        const rawSeconds = minutes(base) - 2;
+        if (rawSeconds >= 0) {
+          solves[ri].raw     = seconds(addSeconds(String(minutes(base)), -2));
+          solves[ri].penalty = 'p2';
+          solves[ri].p2Source = 'typed';
+          applyPenaltyClass(field, 'p2');
+          updatePenBtns(entry, 'p2');
+          recompute();
+          return;
+        }
+      }
+    }
+
+    solves[ri].raw     = v.trim();
+    solves[ri].penalty = null;
+    applyPenaltyClass(field, null);
+    updatePenBtns(entry, null);
+    recompute();
+  });
+
+  field.addEventListener('keydown', e => {
+    const ri = getEntryIndex(field);
+
+    // Delete/Backspace on empty field removes the row
+    if ((e.key === 'Delete' || e.key === 'Backspace') &&
+        field.value === '' && solves.length > 1) {
+      e.preventDefault();
+      const fields = getAllFields();
+      const focusTarget = fields[ri - 1] || fields[ri + 1];
+      solves.splice(ri, 1);
+      entry.remove();
+      renumberRows();
+      updateRemoveBtns();
+      recompute();
+      focusTarget?.focus();
+      return;
+    }
+
+    // Ctrl+1 → clear penalty
+    if (e.ctrlKey && e.key === '1') {
+      e.preventDefault();
+      if (ri === -1) return;
+      solves[ri].penalty = null;
+      solves[ri].p2Source = null;
+      applyFieldDisplay(field, solves[ri]);
+      updatePenBtns(entry, null);
+      recompute();
+      return;
+    }
+    // Ctrl+2 → toggle +2
+    if (e.ctrlKey && e.key === '2') {
+      e.preventDefault();
+      if (ri === -1) return;
+      const isP2 = solves[ri].penalty === 'p2';
+      solves[ri].penalty = isP2 ? null : 'p2';
+      solves[ri].p2Source = isP2 ? null : 'explicit';
+      applyFieldDisplay(field, solves[ri]);
+      updatePenBtns(entry, solves[ri].penalty);
+      recompute();
+      return;
+    }
+    // Ctrl+3 → toggle DNF
+    if (e.ctrlKey && e.key === '3') {
+      e.preventDefault();
+      if (ri === -1) return;
+      solves[ri].penalty = solves[ri].penalty === 'dnf' ? null : 'dnf';
+      applyFieldDisplay(field, solves[ri]);
+      updatePenBtns(entry, solves[ri].penalty);
+      recompute();
+      return;
+    }
+
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const fields = getAllFields();
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+      if (ri > 0) fields[ri - 1].focus();
+    } else {
+      if (ri === fields.length - 1) addRow(true);
+      else fields[ri + 1].focus();
+    }
+  });
+
+  // Penalty buttons
+  const penaltyWrap = document.createElement('div');
+  penaltyWrap.className = 'solve-penalties';
+
+  function makePen(label, type) {
+    const btn = document.createElement('button');
+    btn.className = 'pen-btn' + (s.penalty === type ? ` ${type}` : '');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      const ri = getEntryIndex(field);
+      if (ri === -1) return;
+      const cur = field.value.trim();
+      if (timeRegex(cur)) solves[ri].raw = cur;
+      const isP2 = solves[ri].penalty === type;
+      solves[ri].penalty = isP2 ? null : type;
+      solves[ri].p2Source = !isP2 && type === 'p2' ? 'explicit' : null;
+      applyFieldDisplay(field, solves[ri]);
+      updatePenBtns(entry, solves[ri].penalty);
+      recompute();
+    });
+    return btn;
+  }
+  penaltyWrap.append(makePen('+2', 'p2'), makePen('DNF', 'dnf'));
+
+  // Remove button
+  const rm = document.createElement('button');
+  rm.className = 'remove-btn';
+  rm.textContent = '×';
+  rm.title = 'Remove time';
+  rm.addEventListener('click', () => {
+    if (solves.length <= 1) return;
+    const ri = getEntryIndex(field);
+    if (ri === -1) return;
+    const fields = getAllFields();
+    const focusTarget = fields[ri - 1] || fields[ri + 1];
+    solves.splice(ri, 1);
+    entry.remove();
+    renumberRows();
+    updateRemoveBtns();
+    recompute();
+    focusTarget?.focus();
+  });
+
+  row.append(num, fieldWrap, penaltyWrap, rm);
+
+  const errLine = document.createElement('div');
+  errLine.className = 'solve-error';
+  entry.append(row, errLine);
+  return entry;
+}
+
+function addRow(focusNew = true) {
+  solves.push({ raw: '', penalty: null, p2Source: null });
+  const entry = createEntryEl(solves.length - 1);
+  solveList.appendChild(entry);
+  updateRemoveBtns();
+  if (focusNew) entry.querySelector('.solve-field')?.focus();
+  recompute();
+}
+
+// ── Compute ───────────────────────────────────────────────────────────────────
+function renderTimeStr(s) {
+  if (s.penalty === 'dnf') return s.raw ? `DNF(${s.raw})` : 'DNF';
+  if (s.penalty === 'p2')  return seconds(addSeconds(String(minutes(s.raw)), 2)) + '+';
+  return s.raw;
+}
+
+function recompute() {
+  solveList.querySelectorAll('.solve-error').forEach(el => {
+    el.textContent = ''; el.classList.remove('visible');
+  });
+
+  const entries = getEntries();
+  let hasInvalid = false;
+
+  const formatted = solves.map((s, i) => {
+    const raw = (s.raw || '').trim();
+    if (!raw && s.penalty !== 'dnf') return null;
+    if (s.penalty === 'dnf') return raw ? `DNF(${raw})` : 'DNF';
+    if (!timeRegex(raw)) {
+      setInlineError(entries[i], `"${raw}" is not a valid time`);
+      hasInvalid = true;
+      return null;
+    }
+    return renderTimeStr(s);
+  });
+
+  const filled = formatted.filter(f => f !== null);
+
+  if (hasInvalid) {
+    emptyMsg.style.display = '';
+    emptyMsg.textContent = 'One or more times are invalid.';
+    sumDisplay.style.display = 'none';
+    copyBtn.style.display = 'none';
+    saveToStorage(); return;
+  }
+
+  if (filled.length < 1) {
+    emptyMsg.style.display = '';
+    emptyMsg.textContent = 'Add at least one time on the left.';
+    sumDisplay.style.display = 'none';
+    copyBtn.style.display = 'none';
+    saveToStorage(); return;
+  }
+
+  // Any DNF → result is DNF
+  if (filled.some(f => f === 'DNF' || f.startsWith('DNF('))) {
+    const detail = 'DNF = ' + filled.join(' + ');
+    emptyMsg.style.display = 'none';
+    sumDisplay.style.display = '';
+    sumValue.textContent = 'DNF';
+    sumStrEl.textContent = detail;
+    copyBtn.style.display = '';
+    copyBtn.dataset.result = detail;
+    saveToStorage(); return;
+  }
+
+  // Sum numeric values (+2 adds 2 s)
+  const total = solves.reduce((acc, s) => {
+    const raw = (s.raw || '').trim();
+    if (!raw) return acc;
+    let val = minutes(raw);
+    if (s.penalty === 'p2') val += 2;
+    return acc + val;
+  }, 0);
+
+  // Preserve max decimal precision across all inputs
+  const dec = Math.max(0, ...solves
+    .filter(s => (s.raw || '').trim() && s.penalty !== 'dnf')
+    .map(s => {
+      const secPart = s.raw.includes(':') ? s.raw.split(':')[1] : s.raw;
+      return secPart.includes('.') ? secPart.split('.')[1].length : 0;
+    })
+  );
+
+  const result = seconds(String(parseFloat(total.toFixed(dec))));
+  const detail = result + ' = ' + filled.join(' + ');
+
+  emptyMsg.style.display = 'none';
+  sumDisplay.style.display = '';
+  sumValue.textContent = result;
+  sumStrEl.textContent = detail;
+  copyBtn.style.display = '';
+  copyBtn.dataset.result = detail;
+  saveToStorage();
+}
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+const COPY_FLASH_COLOR = '#4a9e6b';
+
+function triggerCopy() {
+  if (copyBtn.style.display === 'none') return;
+  navigator.clipboard.writeText(copyBtn.dataset.result ?? '');
+  const old = copyBtn.innerHTML;
+  copyBtn.textContent = 'Copied!';
+  copyBtn.style.color = COPY_FLASH_COLOR;
+  copyBtn.style.borderColor = COPY_FLASH_COLOR;
+  setTimeout(() => {
+    copyBtn.innerHTML = old;
+    copyBtn.style.color = '';
+    copyBtn.style.borderColor = '';
+  }, 1500);
+}
+
+copyBtn.addEventListener('click', triggerCopy);
+
+// Ctrl+C → copy result when nothing is selected; Shift+Esc → reset; Ctrl+Z → undo
+document.addEventListener('keydown', e => {
+  if (e.shiftKey && e.key === 'Escape') { e.preventDefault(); triggerReset(); return; }
+  if (e.ctrlKey && e.key === 'z') { if (undoMode) { e.preventDefault(); triggerUndo(); } return; }
+  if (!e.ctrlKey || e.key !== 'c') return;
+  if (copyBtn.style.display === 'none') return;
+  const active = document.activeElement;
+  const hasInputSel = active &&
+    (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+    active.selectionStart !== active.selectionEnd;
+  const hasTextSel = (window.getSelection()?.toString().length ?? 0) > 0;
+  if (!hasInputSel && !hasTextSel) {
+    e.preventDefault();
+    triggerCopy();
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+if (localStorage.getItem(STORAGE_KEY)) {
+  restoreFromStorage();
+} else {
+  suppressSave = true;
+  addRow(true);
+  suppressSave = false;
+}
+</script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

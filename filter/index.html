@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cube Explorer Filterer — Cubetools</title>
+  <meta name="description" content="Filter cube explorer output by making your own rules!">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/filter/">
+  <meta property="og:title" content="Cube Explorer Filterer — Cubetools">
+  <meta property="og:description" content="Filter cube explorer output by making your own rules!">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/filter/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Cube Explorer Filterer — Cubetools">
+  <meta name="twitter:description" content="Filter cube explorer output by making your own rules!">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    /* ── Layout ── */
+    .split-3{display:grid;grid-template-columns:1fr 260px 1fr;height:calc(100vh - var(--nav-h))}
+    @media(max-width:900px){.split-3{grid-template-columns:1fr;height:auto}}
+
+    /* ── Legend ── */
+    .legend{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-top:14px;font-size:0.72rem;line-height:1.9;color:var(--text-dim);background:var(--surface)}
+    .leg-sym{font-family:var(--font-mono);font-size:0.8rem;font-weight:600}
+
+    /* ── Filter col ── */
+    .alg-out{font-family:var(--font-mono);font-size:0.78rem;color:var(--text);line-height:1.9;white-space:pre-wrap;word-break:break-all}
+    #addFilterBtn{margin-top:10px;width:100%}
+    .filter-row{display:flex;align-items:center;gap:4px;margin-top:4px}
+    .btn-icon{width:26px;height:26px;flex-shrink:0;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.82rem;line-height:1;transition:color .12s,border-color .12s,background .12s;padding:0}
+    .btn-icon.btn-clear{color:#97626a;border-color:#97626a55;background:#97626a11}
+    .btn-icon.btn-clear:hover{color:#ff3b5c;border-color:#ff3b5c55;background:#ff3b5c11}
+
+    /* Filter preview row (expression or placeholder) */
+    .filter-preview{flex:1;min-width:0;font-family:var(--font-mono);font-size:0.72rem;padding:3px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-dim);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:26px;display:flex;align-items:center;transition:border-color .12s;user-select:none}
+    .filter-preview:hover{border-color:var(--border-2)}
+    .filter-preview:focus{outline:none;border-color:var(--accent)}
+    .filter-preview.has-errors{border-color:#c41e3a66}
+    .fp-preview-expr{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;pointer-events:none;font-style:italic}
+    .fp-preview-ph{color:var(--text-muted);font-style:italic;pointer-events:none}
+
+    /* ── Token type colours ── */
+    .ft-move                { color: #7ec8e3; }
+    .ft-wildcard            { color: #85dda2; }
+    .ft-anchor-s,.ft-anchor-e { color: #c49deb; }
+    .ft-and                 { color: #7ec8a0; }
+    .ft-perm                { color: #e89d47; }
+    .ft-paren               { color: var(--text-dim); }
+    .ft-invalid             { color: #d86074; }
+
+    /* ── Filter Popup ── */
+    .fp-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:calc(var(--nav-h) + 28px) 16px 24px;opacity:0;pointer-events:none;transition:opacity 0.16s ease}
+    .fp-overlay.open{opacity:1;pointer-events:all}
+    .fp-popup{background:var(--surface);border:1px solid var(--border-2);border-radius:8px;width:100%;max-width:520px;box-shadow:0 20px 60px rgba(0,0,0,0.6);transform:translateY(-10px) scale(0.98);transition:transform 0.22s cubic-bezier(0.22,1,0.36,1);overflow:hidden}
+    .fp-overlay.open .fp-popup{transform:translateY(0) scale(1)}
+    .fp-popup-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+    .fp-popup-title{font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)}
+
+    /* Name + expression stacked */
+    .fp-input-section{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+    .fp-input-section .label{display:block;margin-bottom:3px;font-size:0.7rem}
+    .fp-name-input{width:100%;font-size:0.82rem;font-family:var(--font-ui)}
+    .fp-expr-input{width:100%;min-height:40px;font-size:0.82rem;resize:none;field-sizing:content}
+
+    /* Tokens + mini-legend grid */
+    .fp-main-grid{display:grid;grid-template-columns:1fr 148px}
+    .fp-display-section{padding:8px 14px 10px}
+    .fp-display-label{font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:6px}
+
+    /* ── Token box display: flex wrap so boxes are tight ── */
+    .fp-tokens{
+      font-family:var(--font-mono);font-size:0.82rem;
+      display:flex;flex-wrap:wrap;align-items:center;
+      gap:2px;min-height:24px;cursor:default;user-select:none;
+    }
+    .fp-tokens-empty{color:var(--text-muted);font-style:italic;font-size:0.72rem;line-height:1.4}
+
+    /* Box = one display-group. Height set entirely by padding. */
+    .ft-box{
+      display:inline-flex;align-items:center;
+      padding:1px 4px;border-radius:3px;
+      background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+      cursor:default;transition:background 0.08s,border-color 0.08s;
+      white-space:nowrap;font-size:0.82rem;line-height:1.3;
+    }
+    .ft-box:hover,.ft-box.ft-active{background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.2)}
+    .ft-nl{display:inline-flex;align-items:center;padding:0 7px;color:var(--text-muted);font-weight:700;font-size:0.72rem;letter-spacing:0.04em}
+    /* Space gap */
+    .ft-gap{display:inline-block;width:6px}
+
+    /* ── Paren highlight — 3 cycling depth colours ── */
+    .ft-box.ft-paren-d0{background:rgba(91,196,212,0.14);border-color:rgba(91,196,212,0.55)!important}
+    .ft-box.ft-paren-d1{background:rgba(212,168,75,0.14);border-color:rgba(212,168,75,0.55)!important}
+    .ft-box.ft-paren-d2{background:rgba(163,127,212,0.14);border-color:rgba(163,127,212,0.55)!important}
+    .ft-box.ft-between-d0{border-bottom:2px solid rgba(91,196,212,0.35)}
+    .ft-box.ft-between-d1{border-bottom:2px solid rgba(212,168,75,0.35)}
+    .ft-box.ft-between-d2{border-bottom:2px solid rgba(163,127,212,0.35)}
+
+    /* Per-character colours inside boxes */
+    .ft-char.ft-move                  { color:#7ec8e3; }
+    .ft-char.ft-wildcard              { color:#85dda2; }
+    .ft-char.ft-anchor-s,.ft-char.ft-anchor-e { color:#c49deb; }
+    .ft-char.ft-and                   { color:#7ec8a0; }
+    .ft-char.ft-perm                  { color:#e89d47; }
+    .ft-char.ft-paren                 { color:var(--text-dim); }
+    .ft-char.ft-invalid               { color:#d86074;text-decoration:underline;text-decoration-style:wavy; }
+
+    /* Mini-legend */
+    .fp-mini-legend{border-left:1px solid var(--border);padding:8px 10px 6px;display:flex;flex-direction:column;gap:4px}
+    .fp-ml-row{display:flex;align-items:center;gap:1px;font-size:0.64rem;color:var(--text-muted);line-height:1}
+    .fp-ml-sym{font-family:var(--font-mono);font-size:0.74rem;font-weight:600}
+    .fp-ml-text{margin-left:5px;white-space:nowrap}
+    .fp-ml-divider{height:1px;background:var(--border);margin:2px 0}
+    .fp-ml-note{font-size:0.6rem;color:var(--text-dim);line-height:1.45}
+
+    /* Token info bar */
+    .fp-token-info{padding:6px 14px;font-family:var(--font-mono);font-size:0.71rem;color:var(--text-dim);min-height:30px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+    .fp-ti-type{font-weight:600;font-size:0.62rem;letter-spacing:0.06em;text-transform:uppercase;flex-shrink:0;padding:2px 5px;border-radius:2px;background:rgba(255,255,255,0.06);line-height:1.4}
+    .fp-ti-sep{color:var(--text-dim);flex-shrink:0}
+    .fp-ti-desc{color:var(--text-muted)}
+    .fp-ti-placeholder{color:var(--text-muted);font-style:italic}
+
+    /* Error + save footer */
+    .fp-footer{padding:6px 14px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    .fp-error-area{flex:1;min-width:0}
+    .fp-error-area .format-badge{margin-top:4px}
+    .btn-save{
+      font-family:var(--font-ui);font-size:0.7rem;font-weight:700;
+      text-transform:uppercase;letter-spacing:0.08em;
+      padding:6px 12px;border-radius:var(--radius);border:1px solid #2d6a4f;
+      background:#1e4535;color:#6fcfa0;cursor:pointer;
+      display:inline-flex;align-items:center;gap:5px;
+      white-space:nowrap;flex-shrink:0;align-self:flex-end;
+      transition:background .12s,border-color .12s,color .12s;
+    }
+    .btn-save:hover{background:#2d6a4f;border-color:#3a8a63;color:#a8ecc8}
+  </style>
+</head>
+<body>
+<div id="nav"></div>
+
+<!-- ── Filter Popup (singleton) ── -->
+<div id="fpOverlay" class="fp-overlay">
+  <div class="fp-popup" id="fpPopup">
+    <div class="fp-popup-header">
+      <span class="fp-popup-title" id="fpNum">Filter 1</span>
+      <button class="btn-icon" id="fpClose" title="Close (Esc)" style="font-size:0.7rem">&#x2715;</button>
+    </div>
+    <div class="fp-input-section">
+      <div>
+        <label class="label" for="fpName">name <span style="color:var(--text-muted);font-size:0.65rem;text-transform:none;font-weight:400">(optional)</span></label>
+        <input type="text" id="fpName" class="fp-name-input" placeholder="e.g. no S moves" autocomplete="off" spellcheck="false">
+      </div>
+      <div>
+        <label class="label" for="fpEditor">expression <span style="color:var(--text-muted);font-size:0.65rem;text-transform:none;font-weight:400">(newline = &amp; AND)</span></label>
+        <textarea id="fpEditor" class="fp-expr-input" spellcheck="false" autocomplete="off" placeholder="U | R&#10;(F*/M*)&#10;.S*"></textarea>
+      </div>
+    </div>
+    <div class="fp-main-grid">
+      <div class="fp-display-section">
+        <div class="fp-display-label">tokens</div>
+        <div class="fp-tokens" id="fpTokens">
+          <span class="fp-tokens-empty">Start typing to see token breakdown</span>
+        </div>
+      </div>
+      <div class="fp-mini-legend">
+        <div class="fp-ml-row"><span class="fp-ml-sym ft-wildcard">*</span><span class="fp-ml-text">any modifier</span></div>
+        <div class="fp-ml-row"><span class="fp-ml-sym ft-move">R</span><span class="fp-ml-sym ft-perm">/</span><span class="fp-ml-sym ft-move">U</span><span class="fp-ml-text">any order</span></div>
+        <div class="fp-ml-row"><span class="fp-ml-sym ft-paren">(</span><span class="fp-ml-sym ft-paren">)</span><span class="fp-ml-text">group</span></div>
+        <div class="fp-ml-row"><span class="fp-ml-sym" style="color:var(--text-muted)">&amp;</span><span class="fp-ml-text">AND</span></div>
+        <div class="fp-ml-row"><span class="fp-ml-sym ft-anchor-s">.</span><span class="fp-ml-sym ft-move">R</span><span class="fp-ml-text">starts w/ R</span></div>
+        <div class="fp-ml-row"><span class="fp-ml-sym ft-move">R</span><span class="fp-ml-sym ft-anchor-e">.</span><span class="fp-ml-text">ends w/ R</span></div>
+        <div class="fp-ml-divider"></div>
+        <div class="fp-ml-note">OR: add a filter</div>
+        <div class="fp-ml-note">Matches get removed</div>
+      </div>
+    </div>
+    <div class="fp-token-info" id="fpTokenInfo">
+      <span class="fp-ti-placeholder">hover or place cursor to inspect</span>
+    </div>
+    <div class="fp-footer">
+      <div class="fp-error-area" id="fpErrorWrap" style="display:none">
+        <div class="format-badge" id="fpError"></div>
+      </div>
+      <div class="fp-error-area" id="fpErrorSpacer"></div>
+      <button class="btn-save" id="fpSave">&#x2713; Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="split-3">
+    <!-- Col 1 -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Cube Explorer Filterer</div>
+        <div class="panel-sub">filter cube explorer algs</div>
+      </div>
+      <div class="input-group" style="flex:1;display:flex;flex-direction:column">
+        <label class="label">Raw algs</label>
+        <textarea id="algInput" style="flex:1;resize:none" placeholder="Paste Cube Explorer algs here&#x2026;"></textarea>
+      </div>
+      <button class="btn btn-primary mt-16" id="loadBtn">Load algs <kbd>Ctrl+Enter</kbd></button>
+      <div id="loadCount" class="muted small mt-8"></div>
+    </div>
+
+    <!-- Col 2 -->
+    <div class="panel" style="border-left:1px solid var(--border)">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Filters</div>
+      </div>
+      <div id="filters"></div>
+      <button class="btn btn-ghost" id="addFilterBtn">+ Add filter</button>
+      <div class="legend">
+        <div><span class="leg-sym ft-wildcard">*</span> &#x2014; any modifier (U, U&#x27;, U2)</div>
+        <div><span class="leg-sym ft-move">R</span><span class="leg-sym ft-perm">/</span><span class="leg-sym ft-move">U</span> &#x2014; R then U, any order</div>
+        <div><span class="leg-sym ft-paren">()</span> &#x2014; group tokens</div>
+        <div><span class="leg-sym" style="color:var(--text-muted)">&amp;</span> &#x2014; AND logic (newline or &amp;)</div>
+        <div><span class="leg-sym ft-anchor-s">.</span><span class="leg-sym ft-move">R</span> &#x2014; starts with R</div>
+        <div><span class="leg-sym ft-move">R</span><span class="leg-sym ft-anchor-e">.</span> &#x2014; ends with R</div>
+        <div>Algs that <b>match</b> are <b>removed</b>.</div>
+      </div>
+    </div>
+
+    <!-- Col 3 -->
+    <div class="panel" style="border-left:1px solid var(--border)">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot" style="background:#555"></span>Output</div>
+        <div class="panel-sub">your filtered algs</div>
+        <div class="panel-sub" id="outCountLabel"></div>
+      </div>
+      <button class="btn btn-ghost mb-8" id="copyOutBtn" style="display:none;justify-content:center;">Copy all <kbd>Ctrl+C</kbd></button>
+      <div class="scrollable">
+        <div class="output-empty" id="outEmpty">Load algs to begin filtering.</div>
+        <div class="alg-out" id="algOut"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { buildNav } from '../shared/nav.js';
+buildNav('filter');
+
+const LS_KEY = 'cube-tool-filters';
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let masterAlgs  = [];
+let currentAlgs = [];
+const filtersEl = document.getElementById('filters');
+// filters[i] = { filterStr, name, removed, hasErrors }
+const filters = [];
+
+const undoStack = [];
+
+// ── TOKEN_INFO ─────────────────────────────────────────────────────────────────
+const TOKEN_INFO = {
+  move:      { label:'move',         desc: t => {
+    const wide = t.text.includes('w');
+    const base = t.text.replace(/'$|2$/, '').replace(/w$/, '');
+    return `matches a${wide ? ' wide' : ''} ${t.text} move`;
+  }},
+  wildcard:  { label:'wildcard',     desc: ()=>"expands to: no suffix, \u2019 (inverse), or 2 (double)" },
+  'anchor-s':{ label:'start anchor', desc: ()=>'the following move must be first in the alg' },
+  'anchor-e':{ label:'end anchor',   desc: ()=>'the preceding move must be last in the alg' },
+  perm:      { label:'perm',         desc: ()=>'both the previous clause and the next clause must appear next to each other, in any order' },
+  and:       { label:'and',          desc: ()=>'alg must match both the previous clause and the next clause' },
+  paren:     { label:'group',        desc: t =>t.text==='('?'open group':'close group' },
+  invalid:   { label:'invalid',      desc: t =>`\u201c${t.text}\u201d is not a valid filter character` },
+};
+
+// ── Tokenizer ──────────────────────────────────────────────────────────────────
+const MOVES_SET = new Set('UDLRFBMESxyzudlrfb'.split(''));
+
+function tokenize(input) {
+  const toks = [];
+  let i = 0;
+  while (i < input.length) {
+    const c = input[i];
+    if      (c==='\n') { toks.push({type:'newline',text:'\n',start:i,end:i+1}); i++; }
+    else if (c==='&')  { toks.push({type:'and',    text:'&', start:i,end:i+1}); i++; }
+    else if (c===' ')  { toks.push({type:'space',  text:' ', start:i,end:i+1}); i++; }
+    else if (c==='(')  { toks.push({type:'paren',  text:'(', start:i,end:i+1}); i++; }
+    else if (c===')')  { toks.push({type:'paren',  text:')', start:i,end:i+1}); i++; }
+    else if (c==='/')  { toks.push({type:'perm',   text:'/', start:i,end:i+1}); i++; }
+    else if (c==='.') {
+      const before=input.slice(0,i).trimEnd();
+      const last=before.length?before[before.length-1]:'';
+      toks.push({type:/[A-Za-z0-9'*)]/.test(last)?'anchor-e':'anchor-s',text:'.',start:i,end:i+1}); i++;
+    }
+    else if (c==='*') { toks.push({type:'wildcard',text:'*',start:i,end:i+1}); i++; }
+    else if (MOVES_SET.has(c)) {
+      let text=c;
+      if (input[i+text.length]==='w') text+='w';
+      const nx=input[i+text.length];
+      if (nx==="'"||nx==='2') text+=nx;
+      toks.push({type:'move',text,start:i,end:i+text.length});
+      i+=text.length;
+    } else {
+      toks.push({type:'invalid',text:c,start:i,end:i+1}); i++;
+    }
+  }
+  return toks;
+}
+
+// ── Grouping ───────────────────────────────────────────────────────────────────
+function computeGroups(toks) {
+  const groups=new Array(toks.length).fill(-1);
+  let gid=-1,i=0;
+  while (i<toks.length) {
+    const t=toks[i];
+    if (t.type==='space'||t.type==='newline') { i++; continue; }
+    if (t.type==='anchor-s'&&toks[i+1]?.type==='move') {
+      gid++;
+      groups[i++]=gid;
+      groups[i++]=gid;
+      if (toks[i]?.type==='wildcard') groups[i++]=gid;
+      if (toks[i]?.type==='anchor-e') groups[i++]=gid;
+    } else if (t.type==='move') {
+      gid++;
+      groups[i++]=gid;
+      if (toks[i]?.type==='wildcard') groups[i++]=gid;
+      if (toks[i]?.type==='anchor-e') groups[i++]=gid;
+    } else {
+      groups[i++]=++gid;
+    }
+  }
+  return groups;
+}
+
+// ── Paren pairs ────────────────────────────────────────────────────────────────
+function computeParenPairs(toks, groups) {
+  const pairs=new Map(); const stack=[]; let depth=0;
+  for (let i=0;i<toks.length;i++) {
+    if (toks[i].type!=='paren') continue;
+    const gid=groups[i];
+    if (toks[i].text==='(') { stack.push({gid,level:depth%3}); depth++; }
+    else if (stack.length) {
+      depth--;
+      const {gid:og,level}=stack.pop();
+      pairs.set(og,{matchGid:gid,level});
+      pairs.set(gid,{matchGid:og,level});
+    }
+  }
+  return pairs;
+}
+
+function getBetweenGids(toks, groups, openGid, closeGid) {
+  const between=new Set(); let inside=false,prev=-1;
+  for (let i=0;i<toks.length;i++) {
+    const g=groups[i];
+    if (g===openGid)  { inside=true; continue; }
+    if (g===closeGid) break;
+    if (inside&&g>=0&&g!==prev) { between.add(g); prev=g; }
+  }
+  return between;
+}
+
+// ── Renderer ───────────────────────────────────────────────────────────────────
+function renderGroups(toks, groups, displayGid, parenHL) {
+  if (!toks.length) return '';
+  const parts=[];
+  let i=0;
+  while (i<toks.length) {
+    const t=toks[i];
+    if (t.type==='newline') { parts.push('<span class="ft-nl">&amp;</span>'); i++; continue; }
+    if (t.type==='space')   { parts.push('<span class="ft-gap"></span>'); i++; continue; }
+
+    const gid=groups[i];
+    const segToks=[];
+    while (i<toks.length&&groups[i]===gid) segToks.push(toks[i++]);
+
+    const cls=['ft-box'];
+    if (gid===displayGid) cls.push('ft-active');
+    if (parenHL) {
+      const {openGid,closeGid,level,betweenGids}=parenHL;
+      if (gid===openGid||gid===closeGid) cls.push(`ft-paren-d${level}`);
+      else if (betweenGids.has(gid))     cls.push(`ft-between-d${level}`);
+    }
+
+    const inner=segToks.map(t=>{
+      const e=t.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+      return `<span class="ft-char ft-${t.type}">${e}</span>`;
+    }).join('');
+    parts.push(`<span class="${cls.join(' ')}" data-gid="${gid}">${inner}</span>`);
+  }
+  return parts.join('');
+}
+
+function getActiveGidFromCursor(toks, groups, cursorPos) {
+  for (let i=0;i<toks.length;i++) {
+    if (cursorPos>toks[i].start&&cursorPos<=toks[i].end) return groups[i];
+  }
+  if (cursorPos===0&&toks.length) return groups[0];
+  for (let i=toks.length-1;i>=0;i--) { if (groups[i]>=0) return groups[i]; }
+  return -1;
+}
+
+// ── Group description ──────────────────────────────────────────────────────────
+function describeGroup(segToks) {
+  const move=segToks.find(t=>t.type==='move');
+  const hasS=segToks.some(t=>t.type==='anchor-s');
+  const hasE=segToks.some(t=>t.type==='anchor-e');
+  const hasW=segToks.some(t=>t.type==='wildcard');
+  if (move) {
+    const base=move.text.replace(/'$|2$/,'').replace(/w$/,'');
+    const where=hasS?'starts with':hasE?'ends with':'contains';
+    const moveStr=hasW?`any ${base} move`:`a ${move.text} move`;
+    return `${where} ${moveStr}`;
+  }
+  const t=segToks[0];
+  return t?TOKEN_INFO[t.type]?.desc(t)??null:null;
+}
+
+function showGroupInfo(displayGid) {
+  const ph='<span class="fp-ti-placeholder">hover or place cursor to inspect</span>';
+  if (displayGid<0) { fpTokenInfo.innerHTML=ph; return; }
+  const segToks=lastToks.filter((_,i)=>lastGroups[i]===displayGid&&lastToks[i].type!=='space'&&lastToks[i].type!=='newline');
+  if (!segToks.length) { fpTokenInfo.innerHTML=ph; return; }
+  const badges=segToks.map(t=>`<span class="fp-ti-type ft-${t.type}">${TOKEN_INFO[t.type]?.label??t.type}</span>`).join(' ');
+  const desc=describeGroup(segToks);
+  fpTokenInfo.innerHTML=badges+(desc?` <span class="fp-ti-sep">\u2014</span> <span class="fp-ti-desc">${desc}</span>`:'');
+}
+
+// ── AST Parser ─────────────────────────────────────────────────────────────────
+function parseAST(input) {
+  if (!input.trim()) return null;
+  // Strip newlines (treat as spaces) — for single-line inputs only; AND-splitting
+  // is handled by applyFiltersAST before calling this.
+  const cleaned=input.replace(/\n/g,' ');
+  const toks=tokenize(cleaned);
+  const node=_parseExpr(toks);
+  return node;
+}
+
+function _parseExpr(toks) {
+  const ops=[];
+  let depth=0;
+  for (let i=0;i<toks.length;i++) {
+    if (toks[i].text==='(') depth++;
+    else if (toks[i].text===')') depth--;
+    else if (depth===0&&toks[i].type==='perm') ops.push(i);
+  }
+  if (!ops.length) return _parseSeq(toks);
+  const opType=toks[ops[0]].type;
+  const parts=[]; let prev=0;
+  for (const idx of ops) { parts.push(toks.slice(prev,idx)); prev=idx+1; }
+  parts.push(toks.slice(prev));
+  const children=parts.map(_parseSeq).filter(Boolean);
+  if (!children.length) return null;
+  if (children.length===1) return children[0];
+  return {type:opType,children};
+}
+
+function _parseSeq(toks) {
+  const parts=[[]]; let depth=0;
+  for (const t of toks) {
+    if (t.text==='(') depth++;
+    else if (t.text===')') depth--;
+    if ((t.type==='space'||t.type==='newline'||t.type==='and')&&depth===0) parts.push([]);
+    else parts[parts.length-1].push(t);
+  }
+  const terms=parts.map(p=>p.length?_parseTerm(p):null).filter(Boolean);
+  if (!terms.length) return null;
+  if (terms.length===1) return terms[0];
+  return {type:'seq',children:terms};
+}
+
+function _parseTerm(toks) {
+  if (!toks.length) return null;
+  if (toks[0].type==='paren'&&toks[0].text==='(') {
+    const inner=toks.slice(1,toks[toks.length-1]?.text===')'?-1:toks.length);
+    const body=_parseExpr(inner);
+    return body?{type:'group',body}:null;
+  }
+  let j=0,anchorStart=false,anchorEnd=false,wildcard=false,moveText=null;
+  if (toks[j]?.type==='anchor-s') { anchorStart=true; j++; }
+  if (toks[j]?.type==='move')     { moveText=toks[j].text; j++; }
+  if (toks[j]?.type==='wildcard') { wildcard=true; j++; }
+  if (toks[j]?.type==='anchor-e') { anchorEnd=true; j++; }
+  if (moveText) return {type:'move',text:moveText,anchorStart,anchorEnd,wildcard};
+  return null;
+}
+
+function nodeToRegexes(node) {
+  if (!node) return [];
+  switch (node.type) {
+    case 'perm': {
+      const arrs=node.children.map(c=>nodeToRegexes(c));
+      return permutations(arrs).map(combo=>combo.join(' '));
+    }
+    case 'seq': {
+      const arrs=node.children.map(c=>nodeToRegexes(c));
+      return arrs.reduce((acc,arr)=>acc.flatMap(x=>arr.map(y=>x?`${x} ${y}`:y)),['']);
+    }
+    case 'group': return nodeToRegexes(node.body);
+    case 'move': {
+      const b=node.text;
+      const variants=node.wildcard?[b,b+"'",b+'2']:[b];
+      return variants.map(v=>(node.anchorStart?'^':'')+v+(node.anchorEnd?'$':''));
+    }
+  }
+  return [];
+}
+
+// An alg is removed only if it matches ALL newline-separated clauses.
+function applyFiltersAST(algs, filterStr) {
+  const lines=filterStr.split(/[\n&]/).map(l=>l.trim()).filter(Boolean);
+  if (!lines.length) return algs;
+
+  const lineRegexes=lines.map(line=>{
+    const ast=parseAST(line);
+    if (!ast) return [];
+    return nodeToRegexes(ast)
+      .map(r=>{try{return new RegExp(r);}catch{return null;}})
+      .filter(Boolean);
+  });
+
+  return algs.filter(alg=>{
+    const trimmed=alg.trim();
+    // Remove alg only if ALL clauses match (AND logic)
+    return !lineRegexes.every(regexes=>regexes.length>0&&regexes.some(re=>re.test(trimmed)));
+  });
+}
+
+// ── Error Detection ────────────────────────────────────────────────────────────
+function errInvalidChars(_, toks, _g) {
+  const inv=toks.filter(t=>t.type==='invalid');
+  if (!inv.length) return null;
+  const chars=[...new Set(inv.map(t=>t.text))].map(c=>`\u201c${c}\u201d`).join(', ');
+  return `Unrecognized character${inv.length>1?'s':''}: ${chars}`;
+}
+function errUnclosedParens(_, toks, _g) {
+  let depth=0;
+  for (const t of toks) {
+    if (t.text==='(') depth++;
+    if (t.text===')') { depth--; if (depth<0) return 'Unexpected \u201c)\u201d \u2014 no matching \u201c(\u201d'; }
+  }
+  return depth>0?`Unclosed parenthes${depth>1?'es':'is'} \u2014 missing ${depth} closing \u201c)\u201d`:null;
+}
+function errBinaryOpOperands(_, toks, _g) {
+  for (let i=0;i<toks.length;i++) {
+    const t=toks[i];
+    if (t.type!=='perm') continue;
+    let hasLeft=false,hasRight=false;
+    for (let j=i-1;j>=0;j--) {
+      const tj=toks[j];
+      if (tj.type==='space'||tj.type==='newline') continue;
+      if (['move','wildcard','anchor-e'].includes(tj.type)||(tj.type==='paren'&&tj.text===')')) { hasLeft=true; break; }
+      break;
+    }
+    for (let j=i+1;j<toks.length;j++) {
+      const tj=toks[j];
+      if (tj.type==='space'||tj.type==='newline') continue;
+      if (['move','anchor-s'].includes(tj.type)||(tj.type==='paren'&&tj.text==='(')) { hasRight=true; break; }
+      break;
+    }
+    if (!hasLeft)  return `\u201c${t.text}\u201d is missing a left-side expression`;
+    if (!hasRight) return `\u201c${t.text}\u201d is missing a right-side expression`;
+  }
+  return null;
+}
+function errStandaloneModifiers(_, toks, groups) {
+  const gCount={};
+  for (const g of groups) if (g>=0) gCount[g]=(gCount[g]??0)+1;
+  for (let i=0;i<toks.length;i++) {
+    const t=toks[i],g=groups[i];
+    if (g<0||gCount[g]!==1) continue;
+    if (t.type==='anchor-s') return '"." (start anchor) must be immediately followed by a move';
+    if (t.type==='anchor-e') return '"." (end anchor) must be immediately preceded by a move';
+    if (t.type==='wildcard') return '"*" must immediately follow a move (no space)';
+  }
+  return null;
+}
+function errWildcardLeft(_, toks, _g) {
+  for (let i=0;i<toks.length;i++) {
+    if (toks[i].type!=='wildcard') continue;
+    if (!toks[i-1]||toks[i-1].type!=='move')
+      return '"*" must immediately follow a move \u2014 e.g. U* not *U';
+  }
+  return null;
+}
+function errAdjacentMoves(_, toks, _g) {
+  for (let i=0;i+1<toks.length;i++) {
+    if (toks[i].type==='move'&&toks[i+1].type==='move')
+      return `Adjacent moves \u201c${toks[i].text}${toks[i+1].text}\u201d \u2014 add a space between them`;
+  }
+  return null;
+}
+function errDoubleWildcard(_, toks, _g) {
+  for (let i=0;i+1<toks.length;i++) {
+    if (toks[i].type==='wildcard'&&toks[i+1].type==='wildcard')
+      return '"**" \u2014 a move can have at most one wildcard';
+  }
+  return null;
+}
+function errAdjacentWithoutOp(_, toks, _g) {
+  for (let i=0;i+1<toks.length;i++) {
+    const a=toks[i],b=toks[i+1];
+    const aC=a.type==='paren'&&a.text===')';
+    const bO=b.type==='paren'&&b.text==='(';
+    if (aC&&bO)                        return '")(" \u2014 groups must be separated by an operator';
+    if (aC&&b.type==='move')           return `")${b.text}" \u2014 add a space or operator after )`;
+    if (aC&&b.type==='wildcard')       return '")*" \u2014 add a space or operator after )';
+    if (a.type==='move'&&bO)           return `"${a.text}(" \u2014 add a space or operator before (`;
+    if (a.type==='wildcard'&&bO)       return '"*(" \u2014 wildcard must be followed by a space or operator';
+    if (a.type==='anchor-e'&&(b.type==='move'||b.type==='wildcard'||b.type==='anchor-s'))
+      return `End anchor \u201c.\u201d followed by \u201c${b.text}\u201d \u2014 the end anchor must close the expression`;
+  }
+  return null;
+}
+function errAnchorInPerm(input, toks, _g) {
+  const flat=input.replace(/[\n&]/g,' ');
+  const segs=splitTopLevel(flat,'/');
+  if (segs.length<2) return null;
+  if (segs.some(s=>s.trimStart().startsWith('.')))
+    return 'Start anchor (.) inside a permutation (/) \u2014 one ordering will place it in the middle';
+  if (segs.some(s=>{const t=s.trimEnd();return t.endsWith('.')&&t.length>1;}))
+    return 'End anchor (.) inside a permutation (/) \u2014 one ordering will place it in the middle';
+  return null;
+}
+
+const ERROR_CHECKS=[errInvalidChars,errUnclosedParens,errBinaryOpOperands,
+  errStandaloneModifiers,errWildcardLeft,errAdjacentMoves,
+  errDoubleWildcard,errAdjacentWithoutOp,errAnchorInPerm];
+
+function detectErrors(input, toks) {
+  if (!input.trim()) return [];
+  const groups=computeGroups(toks);
+  const errs=[];
+  for (const fn of ERROR_CHECKS) { const m=fn(input,toks,groups); if (m) errs.push(m); }
+  return [...new Set(errs)];
+}
+
+// ── localStorage ───────────────────────────────────────────────────────────────
+function persistFilters() {
+  const data=filters.map(f=>({filterStr:f.filterStr,name:f.name}));
+  try { localStorage.setItem(LS_KEY,JSON.stringify(data)); } catch {}
+}
+
+function loadPersistedFilters() {
+  try {
+    const raw=localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const data=JSON.parse(raw);
+    if (!Array.isArray(data)) return null;
+    return data;
+  } catch { return null; }
+}
+
+// ── Popup state ────────────────────────────────────────────────────────────────
+const fpOverlay   = document.getElementById('fpOverlay');
+const fpEditor    = document.getElementById('fpEditor');
+const fpNameInput = document.getElementById('fpName');
+const fpTokensEl  = document.getElementById('fpTokens');
+const fpTokenInfo = document.getElementById('fpTokenInfo');
+const fpErrorWrap = document.getElementById('fpErrorWrap');
+const fpErrorEl   = document.getElementById('fpError');
+const fpErrorSpc  = document.getElementById('fpErrorSpacer');
+const fpNum       = document.getElementById('fpNum');
+const fpSaveBtn   = document.getElementById('fpSave');
+
+let activePopupIdx = -1;
+let lastToks       = [];
+let lastGroups     = [];
+let lastParenPairs = new Map();
+let hoveredGid     = -1;
+let cursorGid      = -1;
+let errorTimer     = null;
+
+function getDisplayGid() { return hoveredGid>=0?hoveredGid:cursorGid; }
+
+function openPopup(idx) {
+  activePopupIdx=idx;
+  const name=filters[idx]?.name??'';
+  fpNum.textContent=name.trim()?name.trim():`Filter ${idx+1}`;
+  fpNameInput.value=name;
+  fpEditor.value=filters[idx]?.filterStr??'';
+  clearError();
+  refreshDisplay(fpEditor.value.length);
+  if (fpEditor.value.trim()&&filters[idx]?.hasErrors) {
+    const errs=detectErrors(fpEditor.value,lastToks);
+    if (errs.length) showErrorBadge(errs[0]);
+  }
+  fpOverlay.classList.add('open');
+    requestAnimationFrame(()=>{
+    fpEditor.focus();
+    refreshDisplay(fpEditor.selectionStart??0);
+  });
+}
+
+function saveAndClose() {
+  if (activePopupIdx<0) return;
+  filters[activePopupIdx].name=(fpNameInput.value??'').trim();
+  updatePreview(activePopupIdx);
+  persistFilters();
+  closePopup();
+}
+
+function closePopup() {
+  fpOverlay.classList.remove('open');
+  activePopupIdx=-1;
+  clearTimeout(errorTimer);
+}
+
+function refreshDisplay(cursorPos) {
+  const val=fpEditor.value;
+  lastToks      =tokenize(val);
+  lastGroups    =computeGroups(lastToks);
+  lastParenPairs=computeParenPairs(lastToks,lastGroups);
+  cursorGid     =getActiveGidFromCursor(lastToks,lastGroups,cursorPos);
+
+  const dGid=getDisplayGid();
+  let parenHL=null;
+  if (dGid>=0&&lastParenPairs.has(dGid)) {
+    const {matchGid,level}=lastParenPairs.get(dGid);
+    const isOpen=lastToks.some((t,i)=>lastGroups[i]===dGid&&t.text==='(');
+    const openGid=isOpen?dGid:matchGid, closeGid=isOpen?matchGid:dGid;
+    parenHL={openGid,closeGid,level,betweenGids:getBetweenGids(lastToks,lastGroups,openGid,closeGid)};
+  }
+
+  fpTokensEl.innerHTML=val.trim()
+    ?renderGroups(lastToks,lastGroups,dGid,parenHL)
+    :'<span class="fp-tokens-empty">Start typing to see token breakdown</span>';
+  showGroupInfo(dGid);
+}
+
+function showErrorBadge(msg) {
+  fpErrorEl.textContent=msg;
+  fpErrorWrap.style.display='';
+  fpErrorSpc.style.display='none';
+}
+function clearError() {
+  clearTimeout(errorTimer);
+  fpErrorWrap.style.display='none';
+  fpErrorSpc.style.display='';
+  fpErrorEl.textContent='';
+}
+function scheduleErrorBadge(errs) {
+  clearTimeout(errorTimer);
+  errorTimer=setTimeout(()=>{
+    if (errs.length) showErrorBadge(errs[0]);
+    else clearError();
+  },1000);
+}
+
+// ── Popup events ───────────────────────────────────────────────────────────────
+document.getElementById('fpClose').addEventListener('click', closePopup);
+fpOverlay.addEventListener('click', e=>{ if(e.target===fpOverlay) closePopup(); });
+fpSaveBtn.addEventListener('click', saveAndClose);
+
+// Ctrl+Enter inside popup → save
+fpOverlay.addEventListener('keydown', e=>{
+  if (e.ctrlKey&&e.key==='Enter') { e.preventDefault(); saveAndClose(); }
+  if (e.key==='Escape')           { e.preventDefault(); closePopup(); }
+});
+
+// Name field: update popup title live
+fpNameInput.addEventListener('input', ()=>{
+  if (activePopupIdx<0) return;
+  filters[activePopupIdx].name=(fpNameInput.value??'').trim();
+  // Update popup title to reflect name change
+  const n=filters[activePopupIdx].name;
+  fpNum.textContent=n?n:`Filter ${activePopupIdx+1}`;
+  updatePreview(activePopupIdx);
+});
+
+// Expression changes: live apply + error check (no localStorage persist until Save)
+fpEditor.addEventListener('input', ()=>{
+  if (activePopupIdx<0) return;
+  filters[activePopupIdx].filterStr=fpEditor.value;
+  refreshDisplay(fpEditor.selectionStart??0);
+  const errs=detectErrors(fpEditor.value,lastToks);
+  filters[activePopupIdx].hasErrors=errs.length>0;
+  updatePreview(activePopupIdx);
+  reapplyAll();
+  scheduleErrorBadge(errs);
+});
+fpEditor.addEventListener('keyup',  ()=>refreshDisplay(fpEditor.selectionStart??0));
+fpEditor.addEventListener('click',  ()=>refreshDisplay(fpEditor.selectionStart??0));
+
+fpTokensEl.addEventListener('mouseover', e=>{
+  const box=e.target.closest('[data-gid]');
+  hoveredGid=box?parseInt(box.dataset.gid,10):-1;
+  refreshDisplay(fpEditor.selectionStart??0);
+});
+fpTokensEl.addEventListener('mouseleave', ()=>{
+  hoveredGid=-1;
+  refreshDisplay(fpEditor.selectionStart??0);
+});
+
+// ── Filter row management ──────────────────────────────────────────────────────
+document.getElementById('loadBtn').addEventListener('click', loadAlgs);
+document.getElementById('addFilterBtn').addEventListener('click', ()=>addFilter(true));
+
+const copyOutBtn=document.getElementById('copyOutBtn');
+function triggerCopy() {
+  if (copyOutBtn.style.display==='none') return;
+  navigator.clipboard.writeText(currentAlgs.join('\n'));
+  const old=copyOutBtn.textContent;
+  copyOutBtn.textContent='Copied!';
+  copyOutBtn.style.color='#4a9e6b'; copyOutBtn.style.borderColor='#4a9e6b';
+  setTimeout(()=>{ copyOutBtn.textContent=old; copyOutBtn.style.color=''; copyOutBtn.style.borderColor=''; },1500);
+}
+copyOutBtn.addEventListener('click', triggerCopy);
+
+document.getElementById('algInput').addEventListener('keydown', e=>{
+  if (e.key==='Enter'&&e.ctrlKey) { e.preventDefault(); loadAlgs(); }
+});
+document.addEventListener('keydown', e=>{
+  if (fpOverlay.classList.contains('open')) return;
+  // Copy shortcut
+  if (e.ctrlKey&&e.key==='c') {
+    if (copyOutBtn.style.display==='none') return;
+    const active=document.activeElement;
+    const hasInputSel=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA')&&active.selectionStart!==active.selectionEnd;
+    const hasTextSel=(window.getSelection()?.toString().length??0)>0;
+    if (!hasInputSel&&!hasTextSel) { e.preventDefault(); triggerCopy(); }
+    return;
+  }
+    if (e.ctrlKey&&e.key==='z') {
+    const active=document.activeElement;
+    const isInput=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA');
+    if (!isInput&&undoStack.length) {
+      e.preventDefault();
+      const f=undoStack.pop();
+      addFilter(false,f);
+      reapplyAll();
+      persistFilters();
+    }
+  }
+});
+
+function loadAlgs() {
+  const raw=document.getElementById('algInput').value;
+  masterAlgs=raw.split('\n').map(l=>l.trim()).filter(l=>
+    l&&!['Searching','computation','Using'].some(t=>l.startsWith(t))
+  );
+  currentAlgs=[...masterAlgs];
+  document.getElementById('loadCount').textContent=`${masterAlgs.length} algs loaded`;
+  renderOutput();
+  reapplyAll();
+}
+
+function deleteFilter(idx) {
+  const f=filters[idx];
+  const hasContent=(f.filterStr??'').trim()||(f.name??'').trim();
+  if (hasContent) undoStack.push({filterStr:f.filterStr,name:f.name});
+
+  filters.splice(idx,1);
+  rebuildFiltersUI();
+  reapplyAll();
+  persistFilters();
+}
+
+// Rebuild all filter DOM elements from the filters[] array
+function rebuildFiltersUI() {
+  filtersEl.innerHTML='';
+  const saved=[...filters];
+  filters.length=0;
+  for (const f of saved) addFilter(false,f);
+}
+
+function addFilter(focusNew=true, preset=null) {
+  const idx=filters.length;
+  filters.push({filterStr:preset?.filterStr??'', name:preset?.name??'', removed:0, hasErrors:false});
+
+  const div=document.createElement('div');
+  div.className='filter';
+  div.innerHTML=`
+    <div class="filter-header">
+      <span class="label" id="flabel${idx}">${preset?.name?esc(preset.name.trim()):`Filter ${idx+1}`}</span>
+      <span class="filter-count" id="rc${idx}"></span>
+    </div>
+    <div class="filter-row">
+      <div class="filter-preview" id="fprev${idx}" tabindex="0" role="button" data-idx="${idx}">
+        <span class="fp-preview-ph">click to edit\u2026</span>
+      </div>
+      <button class="btn-icon btn-clear" data-del="${idx}" title="Delete filter">&#x2715;</button>
+    </div>`;
+  filtersEl.appendChild(div);
+
+  // If preset has errors, compute now
+  if (preset?.filterStr) {
+    const toks=tokenize(preset.filterStr);
+    filters[idx].hasErrors=detectErrors(preset.filterStr,toks).length>0;
+  }
+  updatePreview(idx);
+
+  const preview=div.querySelector(`#fprev${idx}`);
+  preview.addEventListener('click', ()=>openPopup(idx));
+  preview.addEventListener('keydown', e=>{
+    if (e.key===' ') { e.preventDefault(); openPopup(idx); }
+  });
+    div.querySelector('[data-del]').addEventListener('click', ()=>deleteFilter(idx));
+
+  if (focusNew) requestAnimationFrame(()=>openPopup(idx));
+}
+
+// label always shows name (or "Filter N")
+function updatePreview(idx) {
+  const el=document.getElementById(`fprev${idx}`);
+  if (!el) return;
+  const f=filters[idx];
+  const name=(f?.name??'').trim();
+  // Collapse newlines to & for single-line preview display
+  const expr=(f?.filterStr??'').replace(/\n/g,' & ').replace(/\s+/g,' ').trim();
+
+  if (expr) {
+    el.innerHTML=`<span class="fp-preview-expr">${esc(expr)}</span>`;
+  } else {
+    el.innerHTML='<span class="fp-preview-ph">click to edit\u2026</span>';
+  }
+  el.classList.toggle('has-errors',!!f?.hasErrors);
+
+  // Label always shows filter name or "Filter N"
+  const label=document.getElementById(`flabel${idx}`);
+  if (label) label.textContent=name?name:`Filter ${idx+1}`;
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function permutations(list) {
+  if (!list.length) return [[]];
+  const res=[];
+  for (let i=0;i<list.length;i++) {
+    const copy=[...list],head=copy.splice(i,1)[0];
+    for (const h of head) for (const r of permutations(copy)) res.push([h,...r]);
+  }
+  return res;
+}
+function splitTopLevel(str, sep) {
+  const parts=[]; let cur='',d=0;
+  for (const c of str) {
+    if (c==='(') d++; else if (c===')') d--;
+    if (c===sep&&d===0) { parts.push(cur); cur=''; } else cur+=c;
+  }
+  return [...parts,cur];
+}
+
+function reapplyAll() {
+  currentAlgs=[...masterAlgs];
+  for (let i=0;i<filters.length;i++) {
+    const before=currentAlgs.length;
+    if (filters[i].filterStr.trim()&&!filters[i].hasErrors)
+      currentAlgs=applyFiltersAST(currentAlgs,filters[i].filterStr);
+    filters[i].removed=before-currentAlgs.length;
+    const rc=document.getElementById(`rc${i}`);
+    if (rc) {
+      rc.textContent=filters[i].removed?`\u2212${filters[i].removed}`:'';
+      rc.className=`filter-count ${filters[i].removed?'removed':''}`;
+    }
+  }
+  renderOutput();
+}
+
+function renderOutput() {
+  document.getElementById('outCountLabel').textContent=
+    masterAlgs.length?`${currentAlgs.length} / ${masterAlgs.length} algs`:'';
+  document.getElementById('outEmpty').style.display=masterAlgs.length?'none':'';
+  document.getElementById('algOut').textContent=currentAlgs.join('\n');
+  document.getElementById('copyOutBtn').style.display=masterAlgs.length?'':'none';
+}
+
+(function boot() {
+  const persisted=loadPersistedFilters();
+  if (persisted&&persisted.length) {
+    for (const f of persisted) addFilter(false,f);
+  } else {
+    addFilter(false);
+  }
+})();
+</script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

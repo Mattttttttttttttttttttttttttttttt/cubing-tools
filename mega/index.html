@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Carrot Converter — Cubetools</title>
+  <meta name="description" content="Convert mega scrambles from carrot to WCA.">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/mega/">
+  <meta property="og:title" content="Carrot Converter — Cubetools">
+  <meta property="og:description" content="Convert mega scrambles from carrot to WCA.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/mega/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Carrot Converter — Cubetools">
+  <meta name="twitter:description" content="Convert mega scrambles from carrot to WCA.">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    .mega-split { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - var(--nav-h)); }
+    .mega-panel { padding: 22px var(--side-pad); display: flex; flex-direction: column; overflow-y: auto; }
+    .mega-panel + .mega-panel { border-left: 1px solid var(--border); }
+    .mega-textarea { flex: none; min-height: calc(8lh + 44px); field-sizing: content; width: 100%; resize: none; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.9; }
+    #copyBtn { width: 100%; justify-content: center; margin-bottom: 10px; transition: color .15s, border-color .15s; }
+    #copyBtn.flash { color: #4a9e6b !important; border-color: #4a9e6b !important; }
+    #wcaOut {
+      font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.9;
+      min-height: 8lh;
+      flex: none;
+      user-select: none;
+    }
+    #wcaOut #wcaText {
+      user-select: text;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .legend { margin-top: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; font-size: 0.72rem; line-height: 1.8; color: var(--text-dim); }
+    .legend code { font-family: var(--font-mono); color: var(--accent); }
+    @media (max-width: 700px) { .mega-split { grid-template-columns: 1fr; height: auto; } }
+  </style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="page">
+  <div class="mega-split">
+    <div class="mega-panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Carrot Converter</div>
+        <div class="panel-sub">convert carrot scrambles to WCA scrambles</div>
+      </div>
+      <textarea class="mega-textarea" id="carrotIn" placeholder="Paste a carrot scramble..." spellcheck="false"></textarea>
+    </div>
+    <div class="mega-panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot" style="background:#555"></span>WCA notation</div>
+        <div class="panel-sub">your formatted scramble</div>
+      </div>
+      <button class="btn btn-ghost" id="copyBtn">Copy results <kbd>Ctrl+C</kbd></button>
+      <div class="output-box" id="wcaOut">
+        <div class="output-empty">WCA notation will appear here…</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { buildNav } from '../shared/nav.js';
+buildNav('mega');
+
+function converter(token) {
+  const s0 = token[0];
+  const s1 = token[1];
+  return 'R' + s0 + s0 + ' D' + s1 + s1;
+}
+
+function convert(text) {
+  return text.split('\n').map(function(line) {
+    var tokens = line.trim().split(/\s+/).filter(Boolean);
+    return tokens.map(function(t) {
+      if (t === 'U' || t === "U'") return t;
+      if (/^[+\-]{2}$/.test(t)) return converter(t);
+      return t;
+    }).join(' ');
+  }).join('\n');
+}
+
+const wcaOut = document.getElementById('wcaOut');
+
+document.getElementById('carrotIn').addEventListener('input', function() {
+  const result = convert(this.value);
+  if (!result.trim()) {
+    wcaOut.innerHTML = '<div class="output-empty">WCA notation will appear here…</div>';
+  } else {
+    wcaOut.innerHTML = `<div id="wcaText"></div>`;
+    wcaOut.querySelector('#wcaText').textContent = result;
+  }
+});
+
+const copyBtn = document.getElementById('copyBtn');
+
+copyBtn.addEventListener('click', function() {
+  navigator.clipboard.writeText(wcaOut.querySelector('#wcaText')?.textContent ?? '');
+  const old = this.innerHTML;
+  this.textContent = 'Copied!';
+  this.classList.add('flash');
+  setTimeout(function() {
+    copyBtn.innerHTML = old;
+    copyBtn.classList.remove('flash');
+  }, 1500);
+});
+
+document.addEventListener('keydown', e => {
+  if (!e.ctrlKey || e.key !== 'c') return;
+  const active = document.activeElement;
+  const hasInputSel = active &&
+    (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+    active.selectionStart !== active.selectionEnd;
+  const hasTextSel = (window.getSelection()?.toString().length ?? 0) > 0;
+  if (!hasInputSel && !hasTextSel) {
+    e.preventDefault();
+    copyBtn.click();
+  }
+});
+</script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

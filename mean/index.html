@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mean Generator — Cubetools</title>
+  <meta name="description" content="Format any length of means. Useful for online comps or compact sharing.">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/mean/">
+  <meta property="og:title" content="Mean Generator — Cubetools">
+  <meta property="og:description" content="Format any length of means. Useful for online comps or compact sharing.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/mean/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Mean Generator — Cubetools">
+  <meta name="twitter:description" content="Format any length of means. Useful for online comps or compact sharing.">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    .solve-list {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .split > .panel:first-child {
+      overflow-y: hidden;
+    }
+
+    .split > .panel:first-child .mt-16 {
+      flex-shrink: 0;
+      padding-top: 8px;
+    }
+
+    .split > .panel:first-child .divider {
+      flex-shrink: 0;
+    }
+
+    .solve-entry { display: flex; flex-direction: column; gap: 3px; }
+    .solve-error {
+      font-family: var(--font-mono); font-size: 0.65rem;
+      color: #d86074; margin-top: 5px;
+      display: none; align-items: center; gap: 5px;
+    }
+    .solve-error::before {
+      content: ''; display: inline-block; width: 12px; height: 11px; flex-shrink: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 18'%3E%3Cpath d='M10 2L2 16h16L10 2z' fill='none' stroke='%23d86074' stroke-width='2.8' stroke-linejoin='round'/%3E%3Crect x='9.1' y='7' width='1.8' height='5' rx='.9' fill='%23d86074'/%3E%3Ccircle cx='10' cy='14' r='1.1' fill='%23d86074'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-size: contain; background-position: center;
+    }
+    .solve-error.visible { display: flex; }
+
+    .drag-handle {
+      width: 16px; height: 28px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3.5px; cursor: grab; flex-shrink: 0;
+      opacity: 0.2; touch-action: none; user-select: none;
+      padding: 2px 3px; transition: opacity 0.1s;
+    }
+    .drag-handle:hover  { opacity: 0.65; }
+    .drag-handle:active { cursor: grabbing; opacity: 1; }
+    .drag-handle span {
+      display: block; width: 10px; height: 1.5px;
+      background: var(--text); border-radius: 1px;
+    }
+
+    .remove-btn {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 1rem; padding: 2px 6px;
+      line-height: 1; flex-shrink: 0;
+      transition: color 0.12s;
+    }
+    .remove-btn:hover { color: #c41e3a; }
+    .remove-btn.hidden { visibility: hidden; pointer-events: none; }
+
+    /* +2 state: orange-yellow */
+    .solve-field.p2-state {
+      color: #d49010;
+      border-color: #d4901066;
+    }
+
+    /* DNF state: accent colour, strikethrough */
+    .solve-field.dnf-state {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+      text-decoration: line-through;
+    }
+
+    /* DNF penalty button active: accent colour */
+    .pen-btn.dnf {
+      color: var(--accent) !important;
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
+      background: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+    }
+
+    .output-mean-str {
+      font-family: var(--font-mono); font-size: 0.8rem;
+      color: var(--text-dim); line-height: 2; word-break: break-all;
+    }
+    #copyBtn { margin-bottom: 10px; }
+    #resetBtn { margin-bottom: 10px; width: 100%; justify-content: center; }
+
+    .bw-section { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 12px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); }
+    .bw-row { display: flex; align-items: baseline; gap: 6px; }
+    .bw-mid { color: var(--text-muted); padding: 0 4px; }
+    .bw-label { color: var(--text-muted); letter-spacing: 0.04em; text-transform: uppercase; }
+    .bw-dnf { color: var(--accent); }
+    .bw-arrow { color: var(--text-muted); padding: 0 2px; }
+    .bw-target-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    #targetInput { width: 90px; padding: 3px 8px; height: auto; line-height: 1.4; }
+    #targetVal.bw-impossible { color: #d86074; }
+    #targetVal.bw-guaranteed { color: #4a9e6b; }
+    .bw-prob { color: var(--text-muted); }
+    .bw-prob.bw-impossible { color: #d86074; }
+    .bw-prob.bw-guaranteed { color: #4a9e6b; }
+    .drop-indicator {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: var(--accent); box-shadow: 0 0 8px var(--accent);
+      border-radius: 1px; pointer-events: none; z-index: 50;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="page">
+  <div class="split">
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Mean Generator</div>
+        <div class="panel-sub">generate a time list that looks nice</div>
+      </div>
+      <button class="btn btn-ghost" id="resetBtn">↺ Reset <kbd>Shift+Esc</kbd></button>
+      <div id="solveList" class="solve-list"></div>
+      <div class="mt-16">
+        <button class="btn btn-ghost" id="addRowBtn">+ Add solve</button>
+      </div>
+      <div class="divider"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot" style="background:#555"></span>Output</div>
+        <div class="panel-sub">your formatted average</div>
+      </div>
+      <button class="btn btn-ghost" id="copyBtn" style="display:none;justify-content:center;">Copy result <kbd>Ctrl+C</kbd></button>
+      <div class="bw-section" id="bpaWpaSection" style="display:none">
+        <div class="bw-target-row">
+          <span><span class="bw-label" style="margin-right:3px;">TARGET</span><span class="tooltip-wrap"><span class="tooltip-q">?</span><span class="tooltip-box">Input your target mean here, and you will see the time you need to aim for on your next solve to get that mean. You will also see approximately how likely you are to meet your target.</span></span></span>
+          <input type="text" id="targetInput" placeholder="e.g. 9.50">
+          <span id="targetVal"></span><span id="targetSep" class="bw-prob" style="display:none">, </span><span id="targetProb" class="bw-prob"></span>
+        </div>
+      </div>
+      <div class="output-box" id="outputBox">
+        <div class="output-empty" id="emptyMsg">Add more solves...</div>
+        <div id="meanDisplay" style="display:none">
+          <div class="output-big" id="meanValue">—</div>
+          <div class="output-mean-str" id="meanStr"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { buildNav } from '../shared/nav.js';
+buildNav('mean');
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let solves    = []; // { raw: string, penalty: null|'p2'|'dnf' }
+let dragState = null;
+let undoMode = false;
+let suppressSave = false;
+let resetPagehideHandler = null;
+let _currentVals = [];
+let _currentDec  = 2;
+const STORAGE_KEY = 'cube-tool-solves';
+const RESET_HTML = '↺ Reset <kbd>Shift+Esc</kbd>';
+const UNDO_HTML  = '↩ Undo <kbd>Ctrl+Z</kbd>';
+
+// ── DOM ───────────────────────────────────────────────────────────────────────
+const solveList     = document.getElementById('solveList');
+const emptyMsg      = document.getElementById('emptyMsg');
+const meanDisplay   = document.getElementById('meanDisplay');
+const meanValue     = document.getElementById('meanValue');
+const meanStr       = document.getElementById('meanStr');
+const copyBtn       = document.getElementById('copyBtn');
+const resetBtn      = document.getElementById('resetBtn');
+const bpaWpaSection = document.getElementById('bpaWpaSection');
+const targetInput   = document.getElementById('targetInput');
+
+document.getElementById('addRowBtn').addEventListener('click', () => addRow(true));
+resetBtn.addEventListener('click', () => undoMode ? triggerUndo() : triggerReset());
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+const timeRegex     = v => /^(\d+:)?\d+(\.\d+)?$/.test(v.trim());
+const getEntries    = () => [...solveList.querySelectorAll('.solve-entry')];
+const getAllFields   = () => [...solveList.querySelectorAll('.solve-field')];
+const getEntryIndex = el => getEntries().indexOf(el.closest('.solve-entry'));
+
+function decimalPlaces(v) {
+  const i = v.lastIndexOf('.');
+  return i >= 0 ? v.length - i - 1 : 0;
+}
+
+function toSeconds(v) {
+  const s = v.trim();
+  if (s.includes(':')) {
+    const [m, sec] = s.split(':');
+    return parseFloat(m) * 60 + parseFloat(sec);
+  }
+  return parseFloat(s);
+}
+
+function formatTime(val, dec) {
+  const prec = dec;
+  if (val >= 60) {
+    const m = Math.floor(val / 60);
+    const s = (val - m * 60).toFixed(prec);
+    return `${m}:${s.padStart(prec + 3, '0')}`;
+  }
+  return val.toFixed(prec);
+}
+
+function renumberRows() {
+  solveList.querySelectorAll('.solve-num').forEach((el, i) => {
+    el.textContent = (i + 1) + '.';
+  });
+}
+
+function updatePenBtns(entry, penalty) {
+  const btns = entry.querySelectorAll('.pen-btn');
+  if (!btns.length) return;
+  btns[0].classList.toggle('p2',  penalty === 'p2');
+  btns[1].classList.toggle('dnf', penalty === 'dnf');
+}
+
+function setInlineError(entry, msg) {
+  const el = entry.querySelector('.solve-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle('visible', !!msg);
+}
+
+// ── DNF input parser ──────────────────────────────────────────────────────────
+// Returns { raw: string } if the typed value is a complete DNF pattern, else null.
+// "DNF(" alone → null (no valid time follows, as specified).
+function parseDnfInput(v) {
+  // Plain "dnf" with nothing after → DNF with no attached time
+  if (/^dnf$/i.test(v.trim())) return { raw: '' };
+  // "dnf" + optional whitespace + optional "(" + valid time + optional ")"
+  // Requires ≥1 digit after the prefix — bare "dnf(" won't match
+  const m = v.match(/^dnf\s*\(?([\d:.]+)\)?$/i);
+  if (m && timeRegex(m[1])) return { raw: m[1] };
+  return null;
+}
+
+// ── Visual state ──────────────────────────────────────────────────────────────
+// applyFieldDisplay: used on init / rebuild / penalty-button / Ctrl+2/3.
+// Sets the canonical field value for the current penalty state. Never readOnly.
+function applyFieldDisplay(field, s) {
+  field.classList.remove('p2-state', 'dnf-state', 'ok', 'err');
+  if (s.penalty === 'p2' && s.raw) {
+    field.value = formatTime(toSeconds(s.raw) + 2, decimalPlaces(s.raw) === 0 ? 0 : decimalPlaces(s.raw)) + '+';
+    field.classList.add('p2-state');
+  } else if (s.penalty === 'dnf') {
+    field.value = s.raw ? `DNF(${s.raw})` : 'DNF';
+    field.classList.add('dnf-state');
+  } else {
+    field.value = s.raw || '';
+  }
+}
+
+// applyPenaltyClass: restyles without touching field.value (preserves cursor).
+function applyPenaltyClass(field, penalty) {
+  field.classList.remove('p2-state', 'dnf-state');
+  if (penalty === 'p2')  field.classList.add('p2-state');
+  if (penalty === 'dnf') field.classList.add('dnf-state');
+}
+
+// ── Show/hide remove buttons ──────────────────────────────────────────────────
+function updateRemoveBtns() {
+  const single = solves.length <= 1;
+  solveList.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.classList.toggle('hidden', single);
+  });
+}
+
+// ── Row creation ──────────────────────────────────────────────────────────────
+function createEntryEl(idx) {
+  const s = solves[idx];
+
+  const entry = document.createElement('div');
+  entry.className = 'solve-entry';
+
+  const row = document.createElement('div');
+  row.className = 'solve-row';
+
+  // Drag handle
+  const handle = document.createElement('div');
+  handle.className = 'drag-handle';
+  handle.innerHTML = '<span></span><span></span><span></span>';
+  handle.addEventListener('pointerdown', e => { e.preventDefault(); startDrag(e, entry); });
+
+  // Number
+  const num = document.createElement('div');
+  num.className = 'solve-num';
+  num.textContent = (idx + 1) + '.';
+
+  // Input
+  const fieldWrap = document.createElement('div');
+  fieldWrap.style.flex = '1';
+  const field = document.createElement('input');
+  field.type = 'text';
+  field.className = 'solve-field';
+  field.placeholder = '0:00.00';
+  applyFieldDisplay(field, s);
+  fieldWrap.appendChild(field);
+
+  field.addEventListener('input', () => {
+    const ri = getEntryIndex(field);
+    if (ri === -1) return;
+    const v = field.value;
+
+    // DNF pattern — "DNF(" alone returns null, so won't trigger here
+    const dnfResult = parseDnfInput(v);
+    if (dnfResult !== null) {
+      solves[ri].raw     = dnfResult.raw;
+      solves[ri].penalty = 'dnf';
+      applyPenaltyClass(field, 'dnf');
+      updatePenBtns(entry, 'dnf');
+      recompute();
+      return;
+    }
+
+    // +2 pattern: ends with "+" and the part before is a valid time
+    if (v.endsWith('+')) {
+      const base = v.slice(0, -1).trim();
+      if (timeRegex(base)) {
+        const rawSeconds = toSeconds(base) - 2;
+        if (rawSeconds >= 0) {
+          solves[ri].raw     = formatTime(rawSeconds, decimalPlaces(base));
+          solves[ri].penalty = 'p2';
+          solves[ri].p2Source = 'typed';
+          applyPenaltyClass(field, 'p2');
+          updatePenBtns(entry, 'p2');
+          recompute();
+          return;
+        }
+      }
+    }
+
+    // Plain value — clear any penalty
+    solves[ri].raw     = v.trim();
+    solves[ri].penalty = null;
+    applyPenaltyClass(field, null);
+    updatePenBtns(entry, null);
+    recompute();
+  });
+
+  field.addEventListener('keydown', e => {
+    const ri = getEntryIndex(field);
+
+    // Delete/Backspace on an empty field removes the row (if more than one)
+    if ((e.key === 'Delete' || e.key === 'Backspace') &&
+        field.value === '' && solves.length > 1) {
+      e.preventDefault();
+      const fields = getAllFields();
+      const focusTarget = fields[ri - 1] || fields[ri + 1];
+      solves.splice(ri, 1);
+      entry.remove();
+      renumberRows();
+      updateRemoveBtns();
+      recompute();
+      focusTarget?.focus();
+      return;
+    }
+
+    // Ctrl+1 → clear penalty
+    if (e.ctrlKey && e.key === '1') {
+      e.preventDefault();
+      if (ri === -1) return;
+      solves[ri].penalty = null;
+      applyFieldDisplay(field, solves[ri]);
+      updatePenBtns(entry, null);
+      recompute();
+      return;
+    }
+    // Ctrl+2 → toggle +2
+    if (e.ctrlKey && e.key === '2') {
+      e.preventDefault();
+      if (ri === -1) return;
+      solves[ri].penalty = solves[ri].penalty === 'p2' ? null : 'p2';
+      applyFieldDisplay(field, solves[ri]);
+      updatePenBtns(entry, solves[ri].penalty);
+      recompute();
+      return;
+    }
+    // Ctrl+3 → toggle DNF
+    if (e.ctrlKey && e.key === '3') {
+      e.preventDefault();
+      if (ri === -1) return;
+      solves[ri].penalty = solves[ri].penalty === 'dnf' ? null : 'dnf';
+      applyFieldDisplay(field, solves[ri]);
+      updatePenBtns(entry, solves[ri].penalty);
+      recompute();
+      return;
+    }
+
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const fields = getAllFields();
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+      if (ri > 0) fields[ri - 1].focus();
+    } else {
+      if (ri === fields.length - 1) addRow(true);
+      else fields[ri + 1].focus();
+    }
+  });
+
+  // Penalty buttons
+  const penaltyWrap = document.createElement('div');
+  penaltyWrap.className = 'solve-penalties';
+
+  function makePen(label, type) {
+    const btn = document.createElement('button');
+    btn.className = 'pen-btn' + (s.penalty === type ? ` ${type}` : '');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      const ri = getEntryIndex(field);
+      if (ri === -1) return;
+      // Capture a plain time from the field if it's currently showing one
+      const cur = field.value.trim();
+      if (timeRegex(cur)) solves[ri].raw = cur;
+      const isP2 = solves[ri].penalty === type;
+      solves[ri].penalty = isP2 ? null : type;
+      solves[ri].p2Source = !isP2 && type === 'p2' ? 'explicit' : null;
+      applyFieldDisplay(field, solves[ri]);
+      updatePenBtns(entry, solves[ri].penalty);
+      recompute();
+    });
+    return btn;
+  }
+  penaltyWrap.append(makePen('+2', 'p2'), makePen('DNF', 'dnf'));
+
+  // Remove button
+  const rm = document.createElement('button');
+  rm.className = 'remove-btn';
+  rm.textContent = '×';
+  rm.title = 'Remove solve';
+  rm.addEventListener('click', () => {
+    if (solves.length <= 1) return;
+    const ri = getEntryIndex(field);
+    if (ri === -1) return;
+    const fields = getAllFields();
+    const focusTarget = fields[ri - 1] || fields[ri + 1];
+    solves.splice(ri, 1);
+    entry.remove();
+    renumberRows();
+    updateRemoveBtns();
+    recompute();
+    focusTarget?.focus();
+  });
+
+  row.append(handle, num, fieldWrap, penaltyWrap, rm);
+
+  const errLine = document.createElement('div');
+  errLine.className = 'solve-error';
+  fieldWrap.appendChild(errLine);
+
+  entry.append(row);
+  return entry;
+}
+
+function rebuildRows() {
+  solveList.innerHTML = '';
+  solves.forEach((_, i) => solveList.appendChild(createEntryEl(i)));
+  updateRemoveBtns();
+}
+
+function addRow(focusNew = true) {
+  solves.push({ raw: '', penalty: null, p2Source: null });
+  const entry = createEntryEl(solves.length - 1);
+  solveList.appendChild(entry);
+  updateRemoveBtns();
+  if (focusNew) entry.querySelector('.solve-field')?.focus();
+  recompute();
+}
+
+// ── Storage & undo ────────────────────────────────────────────────────────────
+function serializeSolves() {
+  return [...solveList.querySelectorAll('.solve-field')]
+    .map(f => f.value.trim()).filter(Boolean).join(', ');
+}
+
+function saveToStorage() {
+  if (suppressSave) return;
+  if (undoMode) exitUndoMode();
+  localStorage.setItem(STORAGE_KEY, serializeSolves());
+}
+
+function enterUndoMode() {
+  undoMode = true;  resetBtn.innerHTML = UNDO_HTML;
+  resetPagehideHandler = () => localStorage.removeItem(STORAGE_KEY);
+  window.addEventListener('pagehide', resetPagehideHandler);
+}
+function exitUndoMode()  {
+  undoMode = false; resetBtn.innerHTML = RESET_HTML;
+  if (resetPagehideHandler) {
+    window.removeEventListener('pagehide', resetPagehideHandler);
+    resetPagehideHandler = null;
+  }
+}
+
+function parseSolveStr(v) {
+  v = v.trim(); if (!v) return null;
+  const d = parseDnfInput(v);
+  if (d !== null) return { raw: d.raw, penalty: 'dnf' };
+  if (v.endsWith('+')) {
+    const base = v.slice(0, -1).trim();
+    if (timeRegex(base)) {
+      const rawSeconds = toSeconds(base) - 2;
+      if (rawSeconds >= 0) return { raw: formatTime(rawSeconds, decimalPlaces(base)), penalty: 'p2', p2Source: 'typed' };
+    }
+  }
+  return { raw: v, penalty: null };
+}
+
+function restoreFromStorage() {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  const parts  = stored ? stored.split(',').map(p => p.trim()).filter(Boolean) : [];
+  const parsed = parts.map(parseSolveStr).filter(Boolean);
+  suppressSave = true;
+  solves = []; solveList.innerHTML = '';
+  if (parsed.length) {
+    parsed.forEach(s => { solves.push(s); solveList.appendChild(createEntryEl(solves.length - 1)); });
+    updateRemoveBtns(); recompute();
+  } else { addRow(true); }
+  suppressSave = false;
+}
+
+function triggerReset() {
+  if (undoMode) return;
+  suppressSave = true;
+  solves = []; solveList.innerHTML = '';
+  addRow(true);
+  suppressSave = false;
+  enterUndoMode();
+}
+
+function triggerUndo() {
+  if (!undoMode) return;
+  suppressSave = true; restoreFromStorage(); suppressSave = false;
+  exitUndoMode();
+}
+
+// ── Drag-to-reorder ───────────────────────────────────────────────────────────
+function startDrag(e, entryEl) {
+  if (dragState) return;
+  const fromIdx = getEntryIndex(entryEl.querySelector('.solve-field'));
+  const rect    = entryEl.getBoundingClientRect();
+
+  const ghost = entryEl.cloneNode(true);
+  ghost.querySelectorAll('input').forEach(inp => {
+    inp.style.border = '1px solid var(--border)';
+    inp.style.boxShadow = 'none';
+    inp.style.color = 'var(--text)';
+    inp.style.textDecoration = 'none';
+  });
+  ghost.querySelector('.solve-error')?.remove();
+  Object.assign(ghost.style, {
+    position: 'fixed', margin: '0', zIndex: '1000',
+    left: rect.left + 'px', top: rect.top + 'px',
+    width: rect.width + 'px', height: rect.height + 'px',
+    opacity: '0.45', pointerEvents: 'none', boxSizing: 'border-box',
+    background: 'var(--surface-2)',
+    borderRadius: 'var(--radius)',
+  });
+  document.body.appendChild(ghost);
+
+  const indicator = document.createElement('div');
+  indicator.className = 'drop-indicator';
+  solveList.appendChild(indicator);
+
+  entryEl.style.opacity = '0.08';
+
+  dragState = { fromIdx, entryEl, ghost, indicator,
+    offsetY: e.clientY - rect.top, dropIdx: fromIdx };
+
+  document.addEventListener('pointermove', onDragMove, { passive: true });
+  document.addEventListener('pointerup', onDragEnd);
+}
+
+function onDragMove(e) {
+  if (!dragState) return;
+  const { ghost, indicator, offsetY } = dragState;
+  ghost.style.top = (e.clientY - offsetY) + 'px';
+
+  const entries  = getEntries().filter(en => en !== dragState.entryEl);
+  const listRect = solveList.getBoundingClientRect();
+  let dropIdx    = solves.length;
+
+  for (let i = 0; i < entries.length; i++) {
+    const r = entries[i].getBoundingClientRect();
+    if (e.clientY < r.top + r.height / 2) { dropIdx = i; break; }
+    else dropIdx = i + 1;
+  }
+  dragState.dropIdx = dropIdx;
+
+  indicator.style.display = 'block';
+  if (entries.length === 0) {
+    indicator.style.top = '0px';
+  } else if (dropIdx < entries.length) {
+    const r = entries[dropIdx].getBoundingClientRect();
+    indicator.style.top = (r.top - listRect.top - 1) + 'px';
+  } else {
+    const r = entries[entries.length - 1].getBoundingClientRect();
+    indicator.style.top = (r.bottom - listRect.top + 1) + 'px';
+  }
+
+  const panel = solveList.closest('.panel');
+  if (panel) {
+    const pr = panel.getBoundingClientRect();
+    if (e.clientY < pr.top + 64) panel.scrollTop -= 10;
+    else if (e.clientY > pr.bottom - 64) panel.scrollTop += 10;
+  }
+}
+
+function onDragEnd() {
+  if (!dragState) return;
+  const { fromIdx, dropIdx, entryEl, ghost, indicator } = dragState;
+  ghost.remove(); indicator.remove(); entryEl.style.opacity = '';
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', onDragEnd);
+  dragState = null;
+
+  if (dropIdx === fromIdx || dropIdx === fromIdx + 1) return;
+  const [moved] = solves.splice(fromIdx, 1);
+  solves.splice(dropIdx > fromIdx ? dropIdx - 1 : dropIdx, 0, moved);
+  rebuildRows();
+  recompute();
+}
+
+// ── Compute ───────────────────────────────────────────────────────────────────
+function recompute() {
+  solveList.querySelectorAll('.solve-error').forEach(el => {
+    el.textContent = ''; el.classList.remove('visible');
+  });
+
+  const entries = getEntries();
+
+  // Validate all rows first — errors show regardless of how many solves are filled
+  let hasInvalid = false;
+  solves.forEach((s, i) => {
+    const raw = (s.raw || '').trim();
+    if (!raw || s.penalty === 'dnf') return;
+    if (!timeRegex(raw)) {
+      setInlineError(entries[i], `"${raw}" is not a valid time`);
+      hasInvalid = true;
+    }
+  });
+
+  const filled = solves.filter(s => (s.raw || '').trim() || s.penalty === 'dnf');
+
+  if (filled.length < 2) {
+    emptyMsg.style.display = '';
+    emptyMsg.textContent = 'Add more solves...';
+    meanDisplay.style.display = 'none';
+    copyBtn.style.display = 'none';
+    bpaWpaSection.style.display = 'none';
+    saveToStorage();
+    return;
+  }
+
+  const labels = solves.map((s, i) => {
+    const raw = (s.raw || '').trim();
+    if (!raw && s.penalty !== 'dnf') return null;
+
+    if (s.penalty === 'dnf' || raw.toUpperCase() === 'DNF')
+      return raw && raw.toUpperCase() !== 'DNF' ? `DNF(${raw})` : 'DNF';
+
+    if (!timeRegex(raw)) return null;
+    if (s.penalty === 'p2') return formatTime(toSeconds(raw) + 2, decimalPlaces(raw)) + '+';
+    return raw;
+  }).filter(Boolean);
+
+  if (hasInvalid) {
+    emptyMsg.style.display = '';
+    emptyMsg.textContent = 'One or more solves are invalid.';
+    meanDisplay.style.display = 'none';
+    copyBtn.style.display = 'none';
+    bpaWpaSection.style.display = 'none';
+    saveToStorage();
+    return;
+  }
+
+  const hasDnf = solves.some(s => s.penalty === 'dnf' || (s.raw || '').toUpperCase() === 'DNF');
+  if (hasDnf) {
+    emptyMsg.style.display = 'none';
+    meanDisplay.style.display = '';
+    meanValue.style.color = 'var(--accent)';
+    meanValue.textContent = 'DNF';
+    meanStr.innerHTML = `<span style="color:var(--text-muted)">${labels.join(', ')}</span>`;
+    copyBtn.dataset.result = `DNF = ${labels.join(', ')}`;
+    copyBtn.style.display = '';
+    bpaWpaSection.style.display = 'none';
+    saveToStorage();
+    return;
+  }
+
+  const vals = solves
+    .filter(s => (s.raw || '').trim())
+    .map(s => toSeconds(s.raw) + (s.penalty === 'p2' ? 2 : 0));
+
+  if (!vals.length) return;
+
+  const mean   = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const dec    = Math.max(...solves.filter(s => s.raw).map(s => decimalPlaces(s.raw)));
+  const result = formatTime(mean, Math.max(dec, 3));
+
+  _currentVals = vals;
+  _currentDec  = dec;
+  emptyMsg.style.display = 'none';
+  meanDisplay.style.display = '';
+  meanValue.style.color = '';
+  meanValue.textContent = result;
+  meanStr.innerHTML = `${result} = <span style="color:var(--text-dim)">${labels.join(', ')}</span>`;
+  copyBtn.dataset.result = `${result} = ${labels.join(', ')}`;
+  copyBtn.style.display = '';
+  computeMeanBpaWpa(vals, dec);
+  saveToStorage();
+}
+
+// ── BPA / WPA / Target ────────────────────────────────────────────────────────
+function normalCDF(z) {
+  if (z < -8) return 0; if (z > 8) return 1;
+  const t = 1 / (1 + 0.3275911 * Math.abs(z));
+  const d = Math.exp(-z * z / 2) * t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  return z >= 0 ? 1 - d : d;
+}
+
+function computeMeanProb(vals, xSecs) {
+  if (vals.length < 2) return null;
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const std  = Math.sqrt(vals.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (vals.length - 1));
+  if (std === 0) return xSecs >= mean ? 1 : 0;
+  return normalCDF((xSecs - mean) / std);
+}
+
+let _currentBpa = '';
+
+function computeMeanBpaWpa(vals, dec) {
+  const sum = vals.reduce((a, b) => a + b, 0);
+  _currentBpa = formatTime(sum / (vals.length + 1), Math.max(dec, 3));
+  bpaWpaSection.style.display = '';
+  refreshMeanTarget(vals, dec, _currentBpa);
+}
+
+function refreshMeanTarget(vals, dec, bpaAvg) {
+  const valEl  = document.getElementById('targetVal');
+  const probEl = document.getElementById('targetProb');
+  const sepEl  = document.getElementById('targetSep');
+  const raw    = targetInput.value.trim();
+
+  function special(msg, cls) {
+    valEl.textContent = msg; valEl.className = cls;
+    probEl.textContent = ''; probEl.className = 'bw-prob';
+    sepEl.style.display = 'none';
+  }
+
+  if (!raw) { special('', ''); return; }
+  const T = toSeconds(raw);
+  if (isNaN(T) || T <= 0) { special('invalid', 'bw-impossible'); return; }
+
+  const bpaSecs = toSeconds(bpaAvg);
+  if (bpaSecs > T) { special('impossible', 'bw-impossible'); return; }
+
+  const sum = vals.reduce((a, b) => a + b, 0);
+  const X   = T * (vals.length + 1) - sum;
+  if (X <= 0) { special('impossible', 'bw-impossible'); return; }
+
+  const p = computeMeanProb(vals, X);
+
+  if (p !== null && p < 0.005) { special('nearly impossible', 'bw-impossible'); return; }
+  if (p !== null && p > 0.995) { special('nearly guaranteed', 'bw-guaranteed'); return; }
+
+  valEl.textContent = '→ ' + formatTime(X, Math.max(dec, 3)) + ' needed';
+  valEl.className   = '';
+  if (p !== null) {
+    probEl.textContent = 'chance ≈ ' + (p * 100).toFixed(1) + '%';
+    probEl.className = 'bw-prob';
+    sepEl.style.display = '';
+  } else {
+    probEl.textContent = ''; sepEl.style.display = 'none';
+  }
+}
+
+targetInput.addEventListener('input', () => {
+  targetInput.value = targetInput.value.replace(/[^0-9.:]/g, '');
+  if (_currentVals.length >= 1)
+    refreshMeanTarget(_currentVals, _currentDec, _currentBpa);
+});
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+const COPY_FLASH_COLOR = '#4a9e6b';
+
+function triggerCopy() {
+  if (copyBtn.style.display === 'none') return;
+  navigator.clipboard.writeText(copyBtn.dataset.result ?? '');
+  const old = copyBtn.innerHTML;
+  copyBtn.textContent = 'Copied!';
+  copyBtn.style.color = COPY_FLASH_COLOR;
+  copyBtn.style.borderColor = COPY_FLASH_COLOR;
+  setTimeout(() => {
+    copyBtn.innerHTML = old;
+    copyBtn.style.color = '';
+    copyBtn.style.borderColor = '';
+  }, 1500);
+}
+
+copyBtn.addEventListener('click', triggerCopy);
+
+// Ctrl+C → copy result when nothing is selected
+document.addEventListener('keydown', e => {
+  if (e.shiftKey && e.key === 'Escape') { e.preventDefault(); triggerReset(); return; }
+  if (e.ctrlKey && e.key === 'z') { if (undoMode) { e.preventDefault(); triggerUndo(); } return; }
+  if (!e.ctrlKey || e.key !== 'c') return;
+  if (copyBtn.style.display === 'none') return;
+  const active = document.activeElement;
+  const hasInputSel = active &&
+    (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+    active.selectionStart !== active.selectionEnd;
+  const hasTextSel = (window.getSelection()?.toString().length ?? 0) > 0;
+  if (!hasInputSel && !hasTextSel) {
+    e.preventDefault();
+    triggerCopy();
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+if (localStorage.getItem(STORAGE_KEY)) {
+  restoreFromStorage();
+} else {
+  suppressSave = true;
+  addRow(true);
+  suppressSave = false;
+}
+</script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

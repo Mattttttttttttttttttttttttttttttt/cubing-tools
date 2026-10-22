@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OBLP Trainer — Cubetools</title>
+  <meta name="description" content="Trainer for OBLP visual. Thanks SAC2 for the design of the squan!">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/oblp/">
+  <meta property="og:title" content="OBLP Trainer — Cubetools">
+  <meta property="og:description" content="Trainer for OBLP visual. Thanks SAC2 for the design of the squan!">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/oblp/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="OBLP Trainer — Cubetools">
+  <meta name="twitter:description" content="Trainer for OBLP visual. Thanks SAC2 for the design of the squan!">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    /* Center a bounded "device-sized" band in the viewport so the content
+       never floats absurdly in a giant screen. */
+    .fc-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - var(--nav-h));padding:32px}
+    .fc-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;width:100%;max-width:600px;max-height:820px;overflow-y:auto}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:6px;width:100%;max-width:560px;padding:36px 40px 32px;text-align:center;cursor:pointer;transition:border-color 0.15s,transform 0.1s;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+    .card:active{transform:scale(0.99)}
+    .card:hover{border-color:var(--border-2)}
+    .card-memo{font-family:var(--font-mono);font-size:2.6rem;font-weight:600;letter-spacing:.06em;color:var(--text);line-height:1}
+    .card-invert{font-family:var(--font-mono);font-size:0.78rem;color:var(--accent);margin-top:5px;min-height:1.15em;letter-spacing:0.05em}
+    .card-tag{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-top:8px;border:none;background:transparent;}
+    .card-viz{display:flex;justify-content:center;align-items:center;margin-top:14px;margin-bottom:2px;min-height:0;overflow:visible}
+    .card-viz .squan{overflow:visible}
+    .card-answer{font-family:var(--font-display);font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;color:var(--accent);margin-top:10px;min-height:2rem}
+    .card-time{font-family:var(--font-mono);font-size:0.82rem;color:var(--text-dim);margin-top:6px}
+    .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+    .mode-switch{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .mode-btn{font-family:var(--font-ui);font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:6px 14px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.12s}
+    .mode-btn.active{background:var(--accent);color:#000}
+    .stats-bar{display:flex;gap:20px;font-size:0.75rem;color:var(--text-dim);font-family:var(--font-mono)}
+    .stats-bar span em{color:var(--text);font-style:normal}
+    .revealed .card{border-color:var(--accent)}
+    .layer-mode-switch{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:visible}
+    .layer-mode-btn{font-family:var(--font-ui);font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:6px 14px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.12s;position:relative}
+    .layer-mode-btn:first-child{border-radius:var(--radius) 0 0 var(--radius)}
+    .layer-mode-btn:last-child{border-radius:0 var(--radius) var(--radius) 0}
+    .layer-mode-btn.active{background:var(--accent);color:#000}
+    .layer-mode-btn::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);background:rgba(20,20,30,0.92);color:#e0e0e0;font-size:0.65rem;font-family:var(--font-mono);padding:3px 8px;border-radius:4px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.12s;z-index:200;letter-spacing:0.04em}
+    .layer-mode-btn:hover::after{opacity:1}
+  </style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="page">
+  <div class="fc-wrap">
+   <div class="fc-inner">
+    <div class="controls">
+      <div class="mode-switch">
+        <button class="mode-btn active" id="modeTwo">Two layer</button>
+        <button class="mode-btn" id="modeOne">One layer</button>
+      </div>
+      <div class="layer-mode-switch" id="layerModeSwitch" style="display:none">
+        <button class="layer-mode-btn active" id="lmRandom" data-tip="Pick any layer shape">Random</button>
+        <button class="layer-mode-btn" id="lmBig" data-tip="Prefer bigger layers">Big</button>
+        <button class="layer-mode-btn" id="lmSmall" data-tip="Prefer smaller layers">Small</button>
+      </div>
+      <div class="stats-bar">
+        <span>Seen: <em id="seenCount">0</em></span>
+        <span>Avg: <em id="avgTime">—</em></span>
+      </div>
+    </div>
+
+    <div class="card" id="flashcard">
+      <div class="card-memo" id="memoText">—</div>
+      <div class="card-invert" id="invertTag"></div>
+      <div class="card-tag" id="memoTag">Click to reveal</div>
+      <div class="card-viz" id="vizArea"></div>
+      <div class="card-answer" id="answerText"></div>
+      <div class="card-time" id="timeText"></div>
+    </div>
+    <div id="errBadge" class="format-badge" style="display:none"></div>
+   </div>
+  </div>
+</div>
+<script type="module">
+import { buildNav } from '../shared/nav.js';
+import SquanLib from '../shared/squanlib.js';
+import { getSVG, setPieceColor, resetPiecesColors } from './draw.js';
+
+buildNav('oblp');
+
+const squanLib = new SquanLib();
+
+// ── OBL digit → piece sticker id ─────────────────────────────────────────────
+//
+// Memo digits 1–8 go clockwise from the top-left corner of the drawn face.
+// Both layers share the same visual layout: 1=TL corner, 2=top edge,
+// 3=TR corner, 4=right edge, 5=BR corner, 6=bottom edge, 7=BL corner, 8=left edge.
+//
+// Derived from draw.js angle calculations (solved hex top='011233455677'
+// bottom='998bbaddcffe', layerOffset top=15 bottom=-195):
+//
+//   top layer:
+//     corner '1' → -45°  → 10:30 (TL) → memo 1
+//     edge   '0' →   0°  → 12:00 (T)  → memo 2
+//     corner '7' → -315° →  1:30 (TR) → memo 3
+//     edge   '6' → -270° →  3:00 (R)  → memo 4
+//     corner '5' → -225° →  4:30 (BR) → memo 5
+//     edge   '4' → -180° →  6:00 (B)  → memo 6
+//     corner '3' → -135° →  7:30 (BL) → memo 7
+//     edge   '2' →  -90° →  9:00 (L)  → memo 8
+//
+//   bottom layer:
+//     corner 'd' → -45°  → 10:30 (TL) → memo 1
+//     edge   'a' →   0°  → 12:00 (T)  → memo 2
+//     corner 'b' → -315° →  1:30 (TR) → memo 3
+//     edge   '8' → -270° →  3:00 (R)  → memo 4
+//     corner '9' → -225° →  4:30 (BR) → memo 5
+//     edge   'e' → -180° →  6:00 (B)  → memo 6
+//     corner 'f' → -135° →  7:30 (BL) → memo 7
+//     edge   'c' →  -90° →  9:00 (L)  → memo 8
+
+const TOP_IDS = { '1':'1 top','2':'0 inner','3':'7 top','4':'6 inner',
+                  '5':'5 top','6':'4 inner','7':'3 top','8':'2 inner' };
+const BOT_IDS = { '1':'d top','2':'a inner','3':'b top','4':'8 inner',
+                  '5':'9 top','6':'e inner','7':'f top','8':'c inner' };
+
+const SOLVED_HEX = '011233455677998bbaddcffe';
+
+function drawOblViz(memoStr, inverted, topOnly = false) {
+  const parts = memoStr.trim().split(/\s+/);
+
+  // non-inverted: parts[0]=bottom face (right SVG), parts[1]=top face (left SVG)
+  // inverted:     parts[0]=top face (left SVG),     parts[1]=bottom face (right SVG)
+  const topMemo = parts.length === 2
+    ? (inverted ? parts[0] : parts[1])
+    : parts[0];
+  const botMemo = parts.length === 2
+    ? (inverted ? parts[1] : parts[0])
+    : '';
+
+  resetPiecesColors();
+
+  let OBLcolortop, OBLcolorbottom;
+  if (oneface) {
+    OBLcolortop = "top";
+  } else if (inverted) {
+    OBLcolortop = "top";
+    // inversion happens on the other layer
+    OBLcolorbottom = topMemo.length < 4 ? "bottom" : "top";
+  } else {
+    OBLcolorbottom = "top";
+    // inversion happens on the other layer
+    OBLcolortop = botMemo.length < 4 ? "bottom" : "top";
+  }
+  const theOtherColor = {"top": "bottom", "bottom": "top"};
+  for (const digit of "12345678") if (TOP_IDS[digit]) setPieceColor(TOP_IDS[digit], theOtherColor[OBLcolortop]);
+  for (const digit of topMemo) if (TOP_IDS[digit]) setPieceColor(TOP_IDS[digit], OBLcolortop);
+
+  if (!oneface) {
+    for (const digit of "12345678") if (BOT_IDS[digit]) setPieceColor(BOT_IDS[digit], theOtherColor[OBLcolorbottom]);
+    for (const digit of botMemo) if (BOT_IDS[digit]) setPieceColor(BOT_IDS[digit], OBLcolorbottom);
+  }
+
+  return getSVG(SOLVED_HEX, 220, 6, !topOnly, topOnly);
+}
+
+// ── Trainer state ─────────────────────────────────────────────────────────────
+
+let oneface  = false;
+let state    = 'question';
+let startTime = 0;
+let memo     = '';
+let inverted = false;
+let times    = [];
+let layerMode = 'random'; // 'random' | 'big' | 'small'
+const complement = (m) => '12345678'.replace(new RegExp(`[${m}]`, 'g'), '');
+
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ── error badge (below the flashcard) ───────────────────────────────────────
+const errBadge = document.getElementById('errBadge');
+function showError(msgs) {
+  const arr = (Array.isArray(msgs) ? msgs : [msgs]).filter(Boolean);
+  errBadge.innerHTML = arr.map(esc).join('<br>');
+  errBadge.style.display = arr.length ? 'flex' : 'none';
+}
+function clearError() {
+  errBadge.innerHTML = '';
+  errBadge.style.display = 'none';
+}
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+// turn a thrown lib error into a short, user-facing reason for the current memo
+function describeError(e) {
+  const msg = (e && e.message ? e.message : String(e))
+    .replace(/^[A-Za-z0-9_]+:\s*/, '')   // strip "fnName: " dev prefix
+    .replace(/\s*\n\s*/g, ' ')           // collapse multi-line messages
+    .trim();
+  return `“${memo}” — ${msg || 'could not resolve'}`;
+}
+
+function nextCard() {
+  state    = 'question';
+  inverted = false;
+  document.getElementById('flashcard').classList.remove('revealed');
+  document.getElementById('answerText').textContent = '';
+  document.getElementById('timeText').textContent   = '';
+  document.getElementById('memoTag').textContent    = 'Click to reveal';
+  document.getElementById('vizArea').innerHTML      = '';
+  document.getElementById('invertTag').textContent  = '';
+  clearError();
+
+  if (oneface) {
+    const corner = rand(SquanLib.TOTAL_CORNERS);
+    const edge   = rand(SquanLib.TOTAL_EDGES);
+    if (!corner && !edge) { nextCard(); return; }
+    let layer = squanLib.sortOblp(corner + edge);
+    if (layerMode === 'small' && layer.length > 4) layer = complement(layer);
+    if (layerMode === 'big'   && layer.length < 4) layer = complement(layer);
+    if (!layer) { nextCard(); return; }
+    memo = layer;
+  } else {
+    const GROUPS   = SquanLib.CORNERS.length;
+    const corners1 = rand(SquanLib.TOTAL_CORNERS);
+    const edges1   = rand(SquanLib.TOTAL_EDGES);
+    const corners2 = rand(SquanLib.CORNERS[GROUPS - 1 - corners1.length]);
+    const edges2   = rand(SquanLib.EDGES[GROUPS - 1 - edges1.length]);
+    const func     = (corners1.length + edges1.length) < 4 ?
+                      (m) => "12345678".replace(new RegExp(`[${m}]`, 'g'), '') :
+                      (m) => m;
+    memo     = squanLib.sortOblp(corners1 + edges1) + ' ' + func(squanLib.sortOblp(corners2 + edges2));
+    inverted = Math.random() < 0.5;
+  }
+
+  document.getElementById('memoText').textContent  = memo;
+  document.getElementById('invertTag').textContent = inverted ? '(invert)' : '';
+  startTime = performance.now();
+}
+
+function reveal() {
+  if (state !== 'question') return;
+  state = 'revealed';
+  const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+  times.push(parseFloat(elapsed));
+
+  const errs = [];
+
+  let answer = '';
+  try {
+    answer = oneface ? squanLib.mattToLayer(memo) : squanLib.mattToNonSpe(memo);
+  } catch(e) {
+    answer = '(unknown)';
+    errs.push(describeError(e));
+  }
+
+  try {
+    document.getElementById('vizArea').innerHTML = drawOblViz(memo, inverted, oneface);
+  } catch(e) {
+    console.warn('OBL viz error:', e);
+    errs.push(describeError(e));
+  }
+
+  showError(errs);
+
+  document.getElementById('answerText').textContent = answer;
+  document.getElementById('timeText').textContent   = `${elapsed}s`;
+  document.getElementById('memoTag').textContent    = 'Click for next';
+  document.getElementById('flashcard').classList.add('revealed');
+
+  document.getElementById('seenCount').textContent = times.length;
+  const avg = times.reduce((a, b) => a + b, 0) / times.length;
+  document.getElementById('avgTime').textContent   = avg.toFixed(3) + 's';
+}
+
+// ── Event wiring ──────────────────────────────────────────────────────────────
+
+document.getElementById('flashcard').addEventListener('click', () => {
+  if (state === 'question') reveal(); else nextCard();
+});
+function updateLayerModeVisibility() {
+  document.getElementById('layerModeSwitch').style.display = oneface ? '' : 'none';
+}
+['lmRandom', 'lmBig', 'lmSmall'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    layerMode = id === 'lmRandom' ? 'random' : id === 'lmBig' ? 'big' : 'small';
+    document.querySelectorAll('.layer-mode-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    nextCard();
+  });
+});
+document.getElementById('modeTwo').addEventListener('click', () => {
+  oneface = false;
+  document.getElementById('modeTwo').classList.add('active');
+  document.getElementById('modeOne').classList.remove('active');
+  updateLayerModeVisibility();
+  nextCard();
+});
+document.getElementById('modeOne').addEventListener('click', () => {
+  oneface = true;
+  document.getElementById('modeOne').classList.add('active');
+  document.getElementById('modeTwo').classList.remove('active');
+  updateLayerModeVisibility();
+  nextCard();
+});
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space')      { e.preventDefault(); if (state === 'question') reveal(); else nextCard(); }
+  if (e.code === 'ArrowRight') nextCard();
+});
+
+nextCard();
+</script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

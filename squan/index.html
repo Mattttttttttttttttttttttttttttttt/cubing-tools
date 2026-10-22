@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Squan Alg Deriver — Cubetools</title>
+  <meta name="description" content="Generate all variants of one or more squan algs and rank them for you. Apply y2s, karnify, and check for bad finishes.">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/squan/">
+  <meta property="og:title" content="Squan Alg Deriver — Cubetools">
+  <meta property="og:description" content="Generate all variants of one or more squan algs and rank them for you. Apply y2s, karnify, and check for bad finishes.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/squan/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Squan Alg Deriver — Cubetools">
+  <meta name="twitter:description" content="Generate all variants of one or more squan algs and rank them for you. Apply y2s, karnify, and check for bad finishes.">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    /* ── Textarea fills the remaining panel space ── */
+    #algInGroup {
+      flex: 1;
+      min-height: 0;
+      /* needed for flex children to shrink */
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    #algIn {
+      flex: 1;
+      min-height: 8lh;
+      /* small-screen floor */
+      resize: none;
+    }
+
+    /* ── Config ── */
+    .config-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .config-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .config-item input[type="text"] {
+      width: 140px;
+    }
+
+    .config-item select {
+      width: auto;
+    }
+
+    /* ── Result rows ── */
+    .alg-row {
+      font-family: var(--font-mono);
+      /* algs use raw notation (| - / \) — ligatures would fuse e.g. "|-" → "├─" */
+      font-variant-ligatures: none;
+      font-feature-settings: "liga" 0, "calt" 0;
+      font-size: .82rem;
+      padding: 6px 2px;
+      border-bottom: 1px solid var(--border);
+      word-break: break-all;
+      display: flex;
+      align-items: flex-start;
+      line-height: 1.5;
+    }
+
+    .alg-row:last-child {
+      border-bottom: none;
+    }
+
+    .alg-row.clickable {
+      cursor: pointer;
+    }
+
+    .alg-row.clickable:hover {
+      background: color-mix(in srgb, var(--text) 4%, transparent);
+      border-radius: var(--radius);
+    }
+
+    .alg-text {
+      flex: 1;
+      user-select: text;
+    }
+
+    .alg-text.top-single {
+      color: var(--accent);
+    }
+
+    .alg-text.top-multi {
+      color: var(--text);
+    }
+
+    .alg-text.variant {
+      color: var(--text-muted);
+    }
+
+    /* indent column for variant rows — same width as the chevron so variant
+       algs line up exactly under their group's top alg */
+    .indent {
+      flex-shrink: 0;
+      width: 24px;
+      user-select: none;
+    }
+
+    .alg-text.noted {
+      color: var(--text-muted);
+    }
+
+    .alg-text.err {
+      color: #c41e3a;
+    }
+
+    .alg-note {
+      font-size: .7rem;
+      color: var(--text-muted);
+      font-style: italic;
+      flex-shrink: 0;
+      padding-left: 8px;
+      padding-top: 1px;
+      user-select: text;
+    }
+
+    /* chevron — never selectable; sized to one alg line so the icon centers
+       vertically on the first line of the alg (which may wrap) */
+    .chevron {
+      flex-shrink: 0;
+      width: 24px;
+      height: calc(.82rem * 1.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .chevron svg {
+      width: 11px;
+      height: 11px;
+      display: block;
+    }
+
+    .chevron.up svg {
+      transform: rotate(180deg);
+    }
+
+    /* ── Copy button ── */
+    #copyBtn {
+      width: 100%;
+      justify-content: center;
+      margin-bottom: 10px;
+      transition: color .15s, border-color .15s;
+    }
+
+    #copyBtn.flash {
+      color: #4a9e6b !important;
+      border-color: #4a9e6b !important;
+    }
+
+    /* ── Derive button spinner ── */
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #goBtn .spinner {
+      display: none;
+      width: 13px;
+      height: 13px;
+      flex-shrink: 0;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+    }
+
+    #goBtn.loading {
+      pointer-events: none;
+      opacity: .75;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    #goBtn.loading .spinner {
+      display: block;
+    }
+
+    #goBtn.loading .btn-label::after {
+      content: ' …';
+    }
+  </style>
+</head>
+
+<body>
+  <div id="nav"></div>
+  <div class="page">
+    <div class="split">
+
+      <!-- ═══ LEFT ═══ -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="dot"></span>Squan Alg Deriver</div>
+          <div class="panel-sub">Paste algs (one per line) — parentheses, commas, slashes, karn all accepted</div>
+        </div>
+
+        <!-- Textarea grows to fill remaining panel height -->
+        <div id="algInGroup" class="input-group">
+          <label class="label" for="algIn">Alg(s)</label>
+          <textarea id="algIn" placeholder="/3,0/-3,3/3,0/&#10;or&#10;10 U' d e U' d e e T' -10"></textarea>
+          <div id="algBadge" class="format-badge" style="display:none;align-items:flex-start"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Output format -->
+        <div class="input-group">
+          <div class="config-row">
+            <div class="config-item">
+              <label class="label" for="karnSel">Output format</label>
+              <select id="karnSel">
+                <option value="auto">Follow alg format</option>
+                <option value="yes">Always karn</option>
+                <option value="no">Never karn</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="goBtn">
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-label">Derive <kbd>Ctrl+Enter</kbd></span>
+        </button>
+      </div>
+
+      <!-- ═══ RIGHT ═══ -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="dot" style="background:#555"></span>Result</div>
+          <div class="panel-sub" id="resultSub"></div>
+        </div>
+        <button class="btn btn-ghost" id="copyBtn" style="display:none">Copy result <kbd>Ctrl+C</kbd></button>
+        <div id="resultOut">
+          <div class="output-empty">Paste alg(s) and click Derive.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { buildNav } from '../shared/nav.js';
+    import SquanLib from '../shared/squanlib.js';
+    buildNav('sq1');
+
+    const squanLib = new SquanLib();
+
+    // ── state ──
+    let flashTimer = null;
+    let lastGroups = null;
+
+    const goBtn = document.getElementById('goBtn');
+    const algBadge = document.getElementById('algBadge');
+
+    // ── error badge (below the input, eats into textarea height) ──
+    function showError(msgs) {
+      const arr = (Array.isArray(msgs) ? msgs : [msgs]).filter(Boolean);
+      algBadge.innerHTML = arr.map(esc).join('<br>');
+      algBadge.style.display = arr.length ? 'flex' : 'none';
+    }
+    function clearError() {
+      algBadge.innerHTML = '';
+      algBadge.style.display = 'none';
+    }
+
+    // turn a thrown lib error into a short, user-facing reason for one alg line
+    function describeError(e, algText) {
+      let msg = (e && e.message ? e.message : String(e))
+        .replace(/^[A-Za-z0-9_]+:\s*/, '')   // strip "fnName: " dev prefix
+        .replace(/\s*\n\s*/g, ' ')           // collapse multi-line messages
+        .trim();
+      if (/two slices in a row/i.test(msg)) msg = 'two slices in a row (check for // or \\\\)';
+      else if (/is weird/i.test(msg)) msg = 'unrecognized move';
+      else if (/has letters/i.test(msg)) msg = 'mixes karn letters with numeric moves';
+      const label = algText.length > 42 ? algText.slice(0, 42) + '…' : algText;
+      return `“${label}” — ${msg || 'could not parse'}`;
+    }
+
+    // ── keyboard shortcuts ──
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); triggerCompute(); return; }
+      if (e.ctrlKey && e.key === 'c') {
+        const btn = document.getElementById('copyBtn');
+        if (btn.style.display === 'none') return;
+        const active = document.activeElement;
+        const hasInputSel = active &&
+          (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+          active.selectionStart !== active.selectionEnd;
+        const hasTextSel = (window.getSelection()?.toString().length ?? 0) > 0;
+        if (!hasInputSel && !hasTextSel) { e.preventDefault(); triggerCopy(); }
+      }
+    });
+
+    goBtn.addEventListener('click', triggerCompute);
+    document.getElementById('copyBtn').addEventListener('click', triggerCopy);
+
+    // ── spinner ──
+    function setBusy(on) {
+      goBtn.classList.toggle('loading', on);
+      goBtn.disabled = on;
+    }
+
+    // yield to browser so spinner renders before heavy work
+    function yieldToBrowser() {
+      return new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+    }
+
+    // ── copy ──
+    function triggerCopy() {
+      if (!lastGroups) return;
+      const text = lastGroups.map(g => {
+        const top = g.variants[0]?.alg ?? '';
+        return top.replace(/ \(bad finish\)| \(alignment changes in CS\)/g, '').trim();
+      }).join('\n');
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        const old = btn.innerHTML;
+        btn.textContent = 'Copied!'; btn.classList.add('flash');
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(() => { btn.innerHTML = old; btn.classList.remove('flash'); }, 1500);
+      });
+    }
+
+    // ── main entry ──
+    async function triggerCompute() {
+      clearError();
+
+      const raw = document.getElementById('algIn').value.trim();
+      if (!raw) { showError('Paste at least one alg.'); return; }
+
+      const lines = raw.split('\n').map(l => l.trim())
+        .filter(l => l && !l.toLowerCase().startsWith('searching'));
+      if (!lines.length) { showError('No valid alg lines found.'); return; }
+
+      const karnSel = document.getElementById('karnSel').value;
+      const karnB = karnSel === 'yes' ? true : karnSel === 'no' ? false : null;
+
+      setBusy(true);
+      await yieldToBrowser();
+
+      try {
+        computeDerived(lines, karnB);
+      } catch (e) {
+        // Unexpected failure (not a per-alg parse error) — surface it instead of
+        // dying silently, and log the full error for debugging.
+        console.error('Squan derive failed:', e);
+        showError('Something went wrong while deriving — tell Matt!!');
+        document.getElementById('resultSub').textContent = '';
+        document.getElementById('resultOut').innerHTML =
+          '<div class="output-empty">Could not derive — see the error badge.</div>';
+        document.getElementById('copyBtn').style.display = 'none';
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    // ── derive ──
+
+    // canonical form of an alg: apply no y2s, strip comments
+    function canonical(algIn, karnB) {
+      try {
+        return squanLib.applyY2s(algIn, [], karnB)
+          .replace(/ \(bad finish\)| \(alignment changes in CS\)/g, '')
+          .trim();
+      } catch { return algIn.trim(); }
+    }
+
+    // ── M/m/e substitution ──
+
+    // An interior diagonal move (x,x) with |x| ∈ {1,2,3} (i.e. an M/m/e move)
+    // can be rewritten as x,x/-x,-x/x,x and merged into its neighbours: negate
+    // the move and add (x,x) to the moves on either side. This is the "other M"
+    // — same effect on the cube, different fingers. Candidates are every interior
+    // move (one between two slices), i.e. 1 ≤ i ≤ n-2; a candidate next to a
+    // boundary merges (x,x) into that boundary misalign move, which is still an
+    // equivalent move sequence. 4/5 are skipped (they are y2s of 2/1) and 6 is
+    // meaningless.
+    function mMoveVariants(numericAlg) {
+      const segs = numericAlg.split('/').map(s => s.trim());
+      const n = segs.length;
+
+      const cands = [];
+      for (let i = 1; i <= n - 2; i++) {
+        const [a, b] = squanLib.addCommas(segs[i] || '0,0').split(',').map(Number);
+        if (a === b && Math.abs(a) >= 1 && Math.abs(a) <= 3) cands.push(i);
+      }
+      if (!cands.length) return [numericAlg];
+
+      // every on/off combination of the candidates
+      const variants = [];
+      const total = 1 << cands.length;
+      for (let mask = 0; mask < total; mask++) {
+        const arr = segs.slice();
+        // apply substitutions left-to-right; each uses the move's current value
+        // (additions keep diagonal moves diagonal, so the identity still holds)
+        for (let k = 0; k < cands.length; k++) {
+          if (!(mask & (1 << k))) continue;
+          const i = cands[k];
+          const x = parseInt(squanLib.addCommas(arr[i]).split(',')[0], 10);
+          const xx = `${x},${x}`;
+          arr[i] = `${squanLib.legalMove(-x)},${squanLib.legalMove(-x)}`;
+          arr[i - 1] = squanLib.addMoves(squanLib.addCommas(arr[i - 1]), xx);
+          arr[i + 1] = squanLib.addMoves(squanLib.addCommas(arr[i + 1]), xx);
+        }
+        variants.push(arr.join('/'));
+      }
+      return variants;
+    }
+
+    // Recompute the (bad finish)/(alignment changes in CS) notes for a numeric
+    // variant — mirrors applyY2s so substituted variants get correct notes.
+    function deriveComment(numericAlg) {
+      const segs = numericAlg.split('/');
+      const firstMove = segs[0];
+      const lastMove = segs[segs.length - 1];
+      const lastIntMove = squanLib.addCommas(segs[segs.length - 2] || '');
+      let comment = '';
+      if (lastIntMove && !SquanLib.GOOD_FINISHES.has(lastIntMove))
+        comment += ' (bad finish)';
+      const { topA: tas, bottomA: bas } = squanLib.getAlignment(firstMove);
+      const { topA: tae, bottomA: bae } = squanLib.getAlignment(lastMove);
+      if (tas !== bas && tas !== tae && tae !== bae)
+        comment += ' (alignment changes in CS)';
+      return comment;
+    }
+
+    function computeDerived(lines, karnB) {
+      const groups = [];
+      const errors = [];
+
+      // dedupe input lines by canonical form
+      const seenCanon = new Set();
+      const uniqueLines = [];
+      for (const line of lines) {
+        const canon = canonical(line, karnB);
+        if (!seenCanon.has(canon)) {
+          seenCanon.add(canon);
+          uniqueLines.push(line);
+        }
+      }
+
+      for (const line of uniqueLines) {
+        // base parse with no y2s — if this throws, the input line itself is bad,
+        // so surface the real reason instead of guessing.
+        try {
+          squanLib.applyY2s(line, [], karnB);
+        } catch (e) {
+          errors.push(describeError(e, line));
+          continue;
+        }
+
+        const numPos = squanLib.countY2Positions(line);
+        const total = 1 << numPos;          // 2^numPos
+        const seen = new Map();            // result string → best score
+
+        // match applyY2s's karn-output decision so substituted variants are
+        // emitted in the same format
+        const kOut = karnB === null ? squanLib.isKarn(line) : karnB;
+
+        // Every combo is a layer-flip of an alg we already proved parses, so none
+        // should fail. If one does, it's a real bug — let it propagate to the
+        // top-level handler rather than hiding it.
+        for (let mask = 0; mask < total; mask++) {
+          const lfLst = [];
+          for (let bit = 0; bit < numPos; bit++) if (mask & (1 << bit)) lfLst.push(bit + 1);
+          const result = squanLib.applyY2s(line, lfLst, karnB);
+          const algOnly = result.replace(/ \(bad finish\)| \(alignment changes in CS\)/g, '').trim();
+          const numericBase = squanLib.isKarn(algOnly) ? squanLib.unkarnify(algOnly) : algOnly;
+
+          // On top of the y2 variant, also try the "other M/m/e": each interior
+          // diagonal move can be swapped for its equivalent form, so enumerate
+          // all combos and treat each as its own variant.
+          for (const numVar of mMoveVariants(numericBase)) {
+            const { score, sliceStart } = squanLib.rateAlg(numVar);
+            const comment = deriveComment(numVar);
+            const out = kOut ? squanLib.karnify(numVar) : numVar;
+
+            // rateAlg recommends a starting slice direction — inject it via the
+            // lib (without the comment, then re-attach it) so it isn't lost.
+            const display = ['/', '\\', '|'].includes(sliceStart)
+              ? squanLib.injectSliceStart(out, sliceStart) + comment
+              : out + comment;
+            if (!seen.has(display) || score > seen.get(display)) seen.set(display, score);
+          }
+        }
+
+        const sorted = [...seen.entries()]
+          .map(([alg, score]) => ({ alg, score }))
+          .sort((a, b) => b.score - a.score);
+        groups.push({ variants: sorted, expanded: false });
+      }
+
+      // Ratings are only meaningful relative to each other, so normalize them
+      // around the median (median → 0) and show each as a signed offset.
+      const allScores = groups.flatMap(g => g.variants.map(v => v.score))
+        .filter(Number.isFinite).sort((a, b) => a - b);
+      let median = 0;
+      if (allScores.length) {
+        const mid = allScores.length >> 1;
+        median = allScores.length % 2 ? allScores[mid] : (allScores[mid - 1] + allScores[mid]) / 2;
+      }
+      for (const g of groups)
+        for (const v of g.variants) v.rating = v.score - median;
+
+      showError(errors);
+      lastGroups = groups;
+
+      const sub = document.getElementById('resultSub');
+      const out = document.getElementById('resultOut');
+
+      if (!groups.length) {
+        sub.textContent = '';
+        out.innerHTML = '<div class="output-empty">No valid algs to derive — see the error badge.</div>';
+        document.getElementById('copyBtn').style.display = 'none';
+        return;
+      }
+
+      const isSingle = groups.length === 1;
+      if (isSingle) {
+        const n = groups[0].variants.length;
+        sub.textContent = `${n} variant${n !== 1 ? 's' : ''} generated${n > 1 ? ', ranked by approximate relative ergonomics' : ''}`;
+      } else {
+        const skipped = lines.length - uniqueLines.length;
+        const parts = [];
+        if (skipped > 0) parts.push(`${skipped} duplicate${skipped !== 1 ? 's' : ''} removed`);
+        if (errors.length) parts.push(`${errors.length} invalid`);
+        sub.textContent = `${groups.length} algs` + (parts.length ? ` (${parts.join(', ')})` : '');
+      }
+
+      renderDerived(groups, isSingle);
+      document.getElementById('copyBtn').style.display = '';
+    }
+
+    // ── render ──
+
+    function renderDerived(groups, isSingle) {
+      const out = document.getElementById('resultOut');
+      out.innerHTML = '';
+
+      if (!groups.length) {
+        out.innerHTML = '<div class="output-empty">No results.</div>';
+        return;
+      }
+
+      if (isSingle) {
+        const g = groups[0];
+        out.innerHTML = g.variants.map((v, i) =>
+          `<div class="alg-row">${i === 0 ? '' : '<span class="indent"></span>'}${buildInner(v.alg, i === 0 ? 'top-single' : 'variant', v.rating)}</div>`
+        ).join('');
+        return;
+      }
+
+      // Multiple algs: accordion
+      const frag = document.createDocumentFragment();
+      for (const g of groups) {
+        const wrap = document.createElement('div');
+        renderGroup(wrap, g);
+        wrap.addEventListener('click', () => {
+          if ((window.getSelection()?.toString().length ?? 0) > 0) return;
+          g.expanded = !g.expanded;
+          renderGroup(wrap, g);
+        });
+        frag.appendChild(wrap);
+      }
+      out.appendChild(frag);
+    }
+
+    // down-chevron; the .up class flips it vertically for the expanded state
+    const CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.29289 8.29289C4.68342 7.90237 5.31658 7.90237 5.70711 8.29289L12 14.5858L18.2929 8.29289C18.6834 7.90237 19.3166 7.90237 19.7071 8.29289C20.0976 8.68342 20.0976 9.31658 19.7071 9.70711L12.7071 16.7071C12.3166 17.0976 11.6834 17.0976 11.2929 16.7071L4.29289 9.70711C3.90237 9.31658 3.90237 8.68342 4.29289 8.29289Z" fill="currentColor"/></svg>`;
+
+    function renderGroup(el, g) {
+      const top = g.variants[0];
+      if (!top) { el.innerHTML = ''; return; }
+      const hasMore = g.variants.length > 1;
+      const chevron = hasMore
+        ? `<span class="chevron${g.expanded ? ' up' : ''}" aria-hidden="true">${CHEVRON_SVG}</span>`
+        : `<span class="chevron" aria-hidden="true"></span>`;
+
+      let html = `<div class="alg-row clickable">
+      ${chevron}
+      ${buildInner(top.alg, 'top-multi', top.rating)}
+    </div>`;
+
+      if (g.expanded && hasMore) {
+        for (let i = 1; i < g.variants.length; i++) {
+          html += `<div class="alg-row" style="background:color-mix(in srgb,var(--surface) 60%,transparent)">
+              <span class="indent"></span>
+              ${buildInner(g.variants[i].alg, 'variant', g.variants[i].rating)}
+            </div>`;
+        }
+      }
+      el.innerHTML = html;
+    }
+
+    // algs with (bad finish) / (alignment changes) are always gray+italic
+    function buildInner(algStr, textCls, score) {
+      const hasBF = algStr.includes('(bad finish)');
+      const hasAC = algStr.includes('(alignment changes in CS)');
+      const hasNote = hasBF || hasAC;
+      const algPart = algStr.replace(/ \(bad finish\)| \(alignment changes in CS\)/g, '').trim();
+      const notes = [];
+      if (hasBF) notes.push('(bad finish)');
+      if (hasAC) notes.push('(alignment changes in CS)');
+      const cls = hasNote ? 'noted' : textCls;
+      let rating = '';
+      if (Number.isFinite(score)) {
+        const r = Math.round(score) || 0;   // collapse -0 → 0
+        rating = ` (${r > 0 ? '+' : ''}${r})`;
+      }
+      return `<span class="alg-text ${cls}">${esc(algPart + rating)}</span>` +
+        (hasNote ? `<span class="alg-note">${esc(notes.join(' '))}</span>` : '');
+    }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+
+</html>

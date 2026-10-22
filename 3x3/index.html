@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Virtual Cube Typing — Cubetools</title>
+  <meta name="description" content="Convert 3x3 natural notation, aka virtual cube typing, into WCA notation.">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/3x3/">
+  <meta property="og:title" content="Virtual Cube Typing — Cubetools">
+  <meta property="og:description" content="Convert 3x3 natural notation, aka virtual cube typing, into WCA notation.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/3x3/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Virtual Cube Typing — Cubetools">
+  <meta name="twitter:description" content="Convert 3x3 natural notation, aka virtual cube typing, into WCA notation.">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    /* ── Layout ── */
+    .notation-wrap {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - var(--nav-h));
+    }
+    .ubox-panel {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+    }
+    .kbd-bottom {
+      border-top: 1px solid var(--border);
+      padding: 14px 22px 18px;
+      display: flex;
+      justify-content: center;
+    }
+    @media(max-width:700px) { .notation-wrap { height: auto; } }
+
+    /* ── U-box ── */
+    #ubox {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.92rem;
+      letter-spacing: 0.06em;
+      line-height: 1.8;
+      color: var(--text);
+      width: 100%;
+      resize: none;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      outline: none;
+      caret-color: var(--accent);
+      transition: border-color 0.12s;
+    }
+    #ubox:focus { border-color: var(--accent); }
+
+    /* ── Keyboard ── */
+    .keyboard { display: flex; flex-direction: column; gap: 5px; }
+    .kbd-row  { display: flex; gap: 5px; }
+
+    .key {
+      min-width: 52px; height: 56px; padding: 0 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+      font-size: 0.65rem;
+      transition: background 0.28s, border-color 0.28s, box-shadow 0.28s;
+    }
+    .key .k { color: var(--text-muted); font-family: var(--font-mono); font-size: 0.67rem; }
+    .key .v { color: var(--accent); font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; }
+
+    .key.pressed {
+      background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+      border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+      box-shadow: inset 0 0 8px color-mix(in srgb, var(--accent) 8%, transparent);
+      transition: background 0.04s, border-color 0.04s, box-shadow 0.04s;
+    }
+    .key.pressed .k { color: var(--text-dim); }
+    .key.pressed .v { filter: brightness(1.15); }
+
+    .key.wide   { min-width: 72px; }
+    .key.spacer { background: transparent; border-color: transparent; }
+
+    /* ── Action keys (ENTER / BACKSPACE) span their half of the keyboard ── */
+    .key.action {
+      flex: 5 1 0;
+      min-width: 0;
+      height: 34px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .key.action:hover { background: var(--surface-2); border-color: var(--border-2); }
+    .key.action:active { background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
+    .action-label {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+
+    /* ── Mobile: shrink keys into a phone-keyboard layout that fits the screen ── */
+    @media (max-width: 700px) {
+      .kbd-bottom { padding: 10px 6px 14px; }
+      .keyboard   { width: 100%; gap: 4px; }
+      .kbd-row    { gap: 4px; }
+      .key {
+        flex: 1 1 0;
+        min-width: 0;
+        height: 46px;
+        padding: 0 1px;
+        gap: 0;
+      }
+      .key.wide   { min-width: 0; }
+      .key.spacer { flex: 0.4 1 0; }
+      .key .k { font-size: 0.55rem; }
+      .key .v { font-size: 0.62rem; }
+    }
+
+    /* ── Copy button ── */
+    #copyBtn {
+      margin-bottom: 8px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #copyBtn.flash {
+      color: #4a9e6b !important;
+      border-color: #4a9e6b !important;
+    }
+
+    /* ── Key tip popup ── */
+    .key-tip {
+      position: fixed;
+      top: calc(var(--nav-h) + 10px);
+      left: 50%;
+      transform: translateX(-50%) translateY(-6px);
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius);
+      padding: 6px 16px;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 300;
+      white-space: nowrap;
+    }
+    .key-tip.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="page">
+  <div class="notation-wrap">
+
+    <!-- ── U-box panel ── -->
+    <div class="ubox-panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Virtual Cube Typing</div>
+        <div class="panel-sub">generate 3x3 notation from virtual cube keymap</div>
+      </div>
+      <button class="btn btn-ghost" id="copyBtn"style="justify-content:center">Copy results <kbd>Ctrl+C</kbd></button>
+      <textarea id="ubox"
+        spellcheck="false"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        inputmode="none"
+        autofocus
+        placeholder="Start typing…"></textarea>
+    </div>
+
+    <!-- ── Bottom: keyboard ── -->
+    <div class="kbd-bottom">
+      <div class="keyboard" id="keyboard"></div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { buildNav } from '../shared/nav.js';
+buildNav('3x3');
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+const DICT = {
+  'i':'R',  'k':"R'", 'j':'U',  'f':"U'", 'd':'L',  'e':"L'",
+  'h':'F',  'g':"F'", 'w':'B',  'o':"B'", 's':'D',  'l':"D'",
+  'c':'M',  'x':"M'", 'y':'S',  't':"S'", '5':'E',  '6':"E'",
+  '-':'f',  '1':"f'", 'n':'u',  'b':"u'", 'v':'l',  'r':"l'",
+  'u':'r',  'm':"r'", 'z':'d',  '/':'d',  '0':'x',  '.':"x'",
+  ';':'y',  'a':"y'", 'p':'z',  'q':"z'"
+};
+
+const KEYBOARD_ROWS = [
+  ['1','2','3','4','5','','6','7','8','9','0'],
+  ['q','w','e','r','t','','y','u','i','o','p'],
+  ['a','s','d','f','g','','h','j','k','l',';'],
+  ['z','x','c','v','b','','n','m','-','.','/',],
+];
+
+// ── Keyboard UI ───────────────────────────────────────────────────────────────
+const keyboardEl = document.getElementById('keyboard');
+
+// Touch / mouse input: focus the box (no OS keyboard thanks to
+// inputmode="none") then feed the existing keydown handler.
+function pressKey(keyName) {
+  ubox.focus();
+  ubox.dispatchEvent(new KeyboardEvent('keydown', { key: keyName, bubbles: true, cancelable: true }));
+  ubox.dispatchEvent(new KeyboardEvent('keyup',   { key: keyName, bubbles: true, cancelable: true }));
+}
+
+KEYBOARD_ROWS.forEach(row => {
+  const rowDiv = document.createElement('div');
+  rowDiv.className = 'kbd-row';
+  row.forEach(k => {
+    const key = document.createElement('div');
+    if (!k) {
+      key.className = 'key spacer';
+    } else {
+      key.className = 'key';
+      key.dataset.key = k;
+      const kSpan = document.createElement('div'); kSpan.className = 'k'; kSpan.textContent = k;
+      const vSpan = document.createElement('div'); vSpan.className = 'v'; vSpan.textContent = DICT[k] ?? '';
+      key.append(kSpan, vSpan);
+      key.addEventListener('pointerdown', e => { e.preventDefault(); pressKey(k); });
+    }
+    rowDiv.appendChild(key);
+  });
+  keyboardEl.appendChild(rowDiv);
+});
+
+// ── Action row: ENTER (under left section) · BACKSPACE (under right) ──────────
+const ACTION_ROW = [
+  { label: 'ENTER',     key: 'Enter'     },
+  null,
+  { label: 'BACKSPACE', key: 'Backspace' },
+];
+const actionRowDiv = document.createElement('div');
+actionRowDiv.className = 'kbd-row';
+ACTION_ROW.forEach(a => {
+  if (!a) { const sp = document.createElement('div'); sp.className = 'key spacer'; actionRowDiv.appendChild(sp); return; }
+  const key = document.createElement('div');
+  key.className = 'key action';
+  const label = document.createElement('div'); label.className = 'action-label'; label.textContent = a.label;
+  key.append(label);
+  key.addEventListener('pointerdown', e => { e.preventDefault(); pressKey(a.key); });
+  actionRowDiv.appendChild(key);
+});
+keyboardEl.appendChild(actionRowDiv);
+
+const pressedTimeouts = new Map();
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  clearTimeout(pressedTimeouts.get(k));
+  pressedTimeouts.delete(k);
+  document.querySelectorAll(`.key[data-key="${CSS.escape(k)}"]`).forEach(el => el.classList.add('pressed'));
+});
+document.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  pressedTimeouts.set(k, setTimeout(() => {
+    document.querySelectorAll(`.key[data-key="${CSS.escape(k)}"]`).forEach(el => el.classList.remove('pressed'));
+    pressedTimeouts.delete(k);
+  }, 90));
+});
+
+// ── showTip ───────────────────────────────────────────────────────────────────
+let tipEl = null, tipTimeout;
+function showTip(msg) {
+  if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'key-tip'; document.body.appendChild(tipEl); }
+  tipEl.textContent = msg;
+  tipEl.classList.add('show');
+  clearTimeout(tipTimeout);
+  tipTimeout = setTimeout(() => tipEl.classList.remove('show'), 2500);
+}
+
+// ── Token engine ──────────────────────────────────────────────────────────────
+function processInput(text) {
+  const tokens = [];
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i].toLowerCase();
+    if (ch === '\n' || ch === ' ') {
+      tokens.push({ idx: tokens.length, inStart: i, inEnd: i + 1, type: ch === '\n' ? 'nl' : 'sp' });
+      i++;
+    } else {
+      const mapped = DICT[ch];
+      if (!mapped) {
+        tokens.push({ idx: tokens.length, inStart: i, inEnd: i + 1, type: 'unknown' });
+        i++;
+      } else if (i + 1 < text.length && text[i + 1].toLowerCase() === ch) {
+        tokens.push({ idx: tokens.length, inStart: i, inEnd: i + 2, type: 'move', out: mapped[0] + '2' });
+        i += 2;
+      } else {
+        tokens.push({ idx: tokens.length, inStart: i, inEnd: i + 1, type: 'move', out: mapped });
+        i++;
+      }
+    }
+  }
+  return tokens;
+}
+
+function buildOutputWithPositions(tokens) {
+  const lineGroups = [[]];
+  for (const tok of tokens) {
+    if (tok.type === 'nl' || tok.type === 'sp') lineGroups.push([]);
+    else if (tok.type === 'move') lineGroups[lineGroups.length - 1].push(tok);
+  }
+  // Only trim leading empty groups; keep trailing so the cursor can sit after a newline
+  while (lineGroups.length > 1 && lineGroups[0].length === 0) lineGroups.shift();
+
+  let outStr = '';
+  const outPositions = [];
+  for (let gi = 0; gi < lineGroups.length; gi++) {
+    if (gi > 0) outStr += '\n';
+    lineGroups[gi].forEach((tok, ti) => {
+      if (ti > 0) outStr += ' ';
+      const outStart = outStr.length;
+      outStr += tok.out;
+      outPositions.push({ tok, outStart, outEnd: outStr.length });
+    });
+  }
+  return { outStr, outPositions };
+}
+
+// ── Cursor mapping ────────────────────────────────────────────────────────────
+// inputPosToOutCursor: maps a raw inputStr position to the visual output cursor.
+// Handles separator territory (between/before/after move tokens) correctly.
+function inputPosToOutCursor(inputPos, outPositions, outStrLen) {
+  if (outPositions.length === 0) return 0;
+  const last = outPositions[outPositions.length - 1];
+  // Past the last move token → trailing-separator territory → end of outStr
+  if (inputPos > last.tok.inEnd) return outStrLen;
+  if (inputPos === last.tok.inEnd) return last.outEnd;
+  for (let i = 0; i < outPositions.length; i++) {
+    const p   = outPositions[i];
+    const prev = i > 0 ? outPositions[i - 1] : null;
+    const prevInEnd  = prev ? prev.tok.inEnd : 0;
+    const prevOutEnd = prev ? prev.outEnd     : 0;
+    if (inputPos <= prevInEnd)    return prevOutEnd;   // at/touching previous token end
+    if (inputPos < p.tok.inStart) return p.outStart;   // in separator gap → snap to next token start
+    if (inputPos <= p.tok.inEnd) {
+      const dS = inputPos - p.tok.inStart, dE = p.tok.inEnd - inputPos;
+      return dS <= dE ? p.outStart : p.outEnd;         // within token → nearest side
+    }
+  }
+  return outStrLen;
+}
+
+// outCursorToInputPos: inverse — click position in output → position in inputStr.
+function outCursorToInputPos(outCursor, outPositions, inputStrLen) {
+  if (outPositions.length === 0) return 0;
+  const last = outPositions[outPositions.length - 1];
+  if (outCursor >= last.outEnd) return inputStrLen ?? last.tok.inEnd;
+  for (let i = 0; i < outPositions.length; i++) {
+    const p          = outPositions[i];
+    const prevOutEnd = i > 0 ? outPositions[i - 1].outEnd    : 0;
+    const prevInEnd  = i > 0 ? outPositions[i - 1].tok.inEnd : 0;
+    if (outCursor <= p.outStart) {
+      const dB = outCursor - prevOutEnd, dA = p.outStart - outCursor;
+      return dB <= dA ? prevInEnd : p.tok.inStart;
+    }
+    if (outCursor < p.outEnd) {
+      const dS = outCursor - p.outStart, dE = p.outEnd - outCursor;
+      return dS < dE ? p.tok.inStart : p.tok.inEnd;
+    }
+  }
+  return inputStrLen ?? last.tok.inEnd;
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let inputStr = '';
+let cursorInputPos = 0;
+let currentTokens = [];
+let currentOutPositions = [];
+let currentOutStr = '';
+const ubox = document.getElementById('ubox');
+
+// ── Undo / Redo ───────────────────────────────────────────────────────────────
+const undoStack = [], redoStack = [];
+const HISTORY_LIMIT = 100;
+function saveHistory() {
+  undoStack.push({ inputStr, cursorInputPos });
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
+function applyHistoryState(s) {
+  inputStr = s.inputStr;
+  cursorInputPos = s.cursorInputPos;
+  fullUpdate();
+}
+
+function renderUbox() {
+  const { outStr, outPositions } = buildOutputWithPositions(currentTokens);
+  currentOutPositions = outPositions;
+  currentOutStr = outStr;
+  if (ubox.value !== outStr) ubox.value = outStr;
+  const c = inputPosToOutCursor(cursorInputPos, outPositions, outStr.length);
+  ubox.setSelectionRange(c, c);
+}
+
+function fullUpdate() {
+  currentTokens = processInput(inputStr);
+  renderUbox();
+}
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+const copyBtn = document.getElementById('copyBtn');
+let flashTimeout;
+function flashCopy() {
+  const old = copyBtn.innerHTML;
+  copyBtn.textContent = 'Copied!';
+  copyBtn.classList.add('flash');
+  clearTimeout(flashTimeout);
+  flashTimeout = setTimeout(() => { copyBtn.innerHTML = old; copyBtn.classList.remove('flash'); }, 1500);
+}
+copyBtn.addEventListener('click', () => { navigator.clipboard.writeText(ubox.value); flashCopy(); });
+
+// ── Selection deletion ────────────────────────────────────────────────────────
+function deleteSelectedTokens() {
+  const selStart = ubox.selectionStart, selEnd = ubox.selectionEnd;
+  if (selStart === selEnd) return false;
+  // Any move token whose output range overlaps the selection
+  const touched = currentOutPositions.filter(p => p.outStart < selEnd && p.outEnd > selStart);
+  if (!touched.length) return false;
+  const firstInStart = touched[0].tok.inStart; // cursor lands here after deletion
+  // Delete in reverse input order so earlier positions stay valid
+  const sorted = [...touched].sort((a, b) => b.tok.inStart - a.tok.inStart);
+  let str = inputStr;
+  for (const p of sorted) str = str.slice(0, p.tok.inStart) + str.slice(p.tok.inEnd);
+  inputStr = str;
+  cursorInputPos = firstInStart;
+  return true;
+}
+
+// ── Shared ctrl handler (works focused or not) ────────────────────────────────
+function handleCtrl(e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
+  if (e.key === 'c') {
+    if (ubox.selectionStart === ubox.selectionEnd) {
+      e.preventDefault();
+      navigator.clipboard.writeText(ubox.value);
+      flashCopy();
+    }
+    return true;
+  }
+  if (e.key === 'z') {
+    e.preventDefault();
+    if (undoStack.length) { redoStack.push({ inputStr, cursorInputPos }); applyHistoryState(undoStack.pop()); }
+    return true;
+  }
+  if (e.key === 'y') {
+    e.preventDefault();
+    if (redoStack.length) { undoStack.push({ inputStr, cursorInputPos }); applyHistoryState(redoStack.pop()); }
+    return true;
+  }
+  if (/^[a-zA-Z0-9]$/.test(e.key)) return true; // valid shortcut
+  return false; // e.g. let browser handle
+}
+
+// ── U-box keydown ─────────────────────────────────────────────────────────────
+function lineStart(pos) { return pos > 0 ? inputStr.lastIndexOf('\n', pos - 1) + 1 : 0; }
+function lineEnd(pos)   { const n = inputStr.indexOf('\n', pos); return n === -1 ? inputStr.length : n; }
+
+ubox.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && handleCtrl(e)) return;
+  if (e.altKey) return;
+
+  const moveToks = currentTokens.filter(t => t.type === 'move' || t.type === 'nl' || t.type === 'sp');
+  const mod = e.ctrlKey || e.metaKey;
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const gaps = [0, ...moveToks.map(t => t.inEnd)];
+    const prev = [...gaps].reverse().find(g => g < cursorInputPos);
+    cursorInputPos = prev ?? 0;
+    renderUbox(); return;
+  }
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    const gaps = [...moveToks.map(t => t.inEnd), inputStr.length];
+    const next = gaps.find(g => g > cursorInputPos);
+    cursorInputPos = next ?? inputStr.length;
+    renderUbox(); return;
+  }
+  if (!mod && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    const outLen = currentOutStr.length;
+    const cur = inputPosToOutCursor(cursorInputPos, currentOutPositions, outLen);
+    const rows = currentOutStr.split('\n');
+    let li = 0, col = cur;
+    while (col > rows[li].length) { col -= rows[li].length + 1; li++; }
+    const ti = Math.max(0, Math.min(rows.length - 1, li + (e.key === 'ArrowDown' ? 1 : -1)));
+    const tcol = Math.min(col, rows[ti].length);
+    let desired = tcol;
+    for (let i = 0; i < ti; i++) desired += rows[i].length + 1;
+    const gaps = [0, ...moveToks.map(t => t.inEnd), inputStr.length];
+    const lStart = desired - tcol, lEnd = lStart + rows[ti].length;
+    let cands = gaps.filter(g => {
+      const o = inputPosToOutCursor(g, currentOutPositions, outLen);
+      return o >= lStart && o <= lEnd;
+    });
+    if (!cands.length) cands = gaps;
+    let best = cands[0], bd = Infinity;
+    for (const g of cands) {
+      const d = Math.abs(inputPosToOutCursor(g, currentOutPositions, outLen) - desired);
+      if (d <= bd) { bd = d; best = g; }
+    }
+    cursorInputPos = best;
+    renderUbox(); return;
+  }
+  if (mod && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Home' || e.key === 'End')) {
+    e.preventDefault();
+    if (e.key === 'ArrowUp') {
+      const ls = lineStart(cursorInputPos);
+      cursorInputPos = cursorInputPos > ls ? ls : lineStart(Math.max(0, ls - 1));
+    } else if (e.key === 'ArrowDown') {
+      const le = lineEnd(cursorInputPos);
+      cursorInputPos = cursorInputPos < le ? le : lineEnd(Math.min(inputStr.length, le + 1));
+    } else if (e.key === 'Home') {
+      cursorInputPos = 0;
+    } else {
+      cursorInputPos = inputStr.length;
+    }
+    renderUbox(); return;
+  }
+  if (e.key === 'Home' || e.key === 'End') {
+    e.preventDefault();
+    cursorInputPos = e.key === 'Home' ? lineStart(cursorInputPos) : lineEnd(cursorInputPos);
+    renderUbox(); return;
+  }
+  if (e.key === 'Tab' || e.key === 'Escape') { e.preventDefault(); return; }
+
+  // ── Deletion ──────────────────────────────────────────────────────────────
+  if (e.key === 'Backspace') {
+    e.preventDefault();
+    saveHistory();
+    if (deleteSelectedTokens()) { fullUpdate(); return; }
+    let tokToDelete = null;
+    for (const t of moveToks) { if (t.inEnd <= cursorInputPos) tokToDelete = t; }
+    if (tokToDelete) {
+      inputStr = inputStr.slice(0, tokToDelete.inStart) + inputStr.slice(tokToDelete.inEnd);
+      cursorInputPos = tokToDelete.inStart;
+    }
+    fullUpdate(); return;
+  }
+  if (e.key === 'Delete') {
+    e.preventDefault();
+    saveHistory();
+    if (deleteSelectedTokens()) { fullUpdate(); return; }
+    let tokToDelete = null;
+    for (const t of moveToks) { if (t.inStart >= cursorInputPos) { tokToDelete = t; break; } }
+    if (tokToDelete) inputStr = inputStr.slice(0, tokToDelete.inStart) + inputStr.slice(tokToDelete.inEnd);
+    fullUpdate(); return;
+  }
+
+  // ── Separator (Enter and Space both insert a line break) ──────────────────
+  if (e.key === 'Enter' || e.key === "Space") {
+    e.preventDefault();
+    saveHistory();
+    deleteSelectedTokens();
+    inputStr = inputStr.slice(0, cursorInputPos) + '\n' + inputStr.slice(cursorInputPos);
+    cursorInputPos++;
+    fullUpdate(); return;
+  }
+
+  // ── Character input ───────────────────────────────────────────────────────
+  if (e.key.length === 1) {
+    e.preventDefault();
+    const ch = e.key.toLowerCase();
+    if (ch === ' ') {
+      // Space = line break, same as Enter
+      saveHistory();
+      deleteSelectedTokens();
+      inputStr = inputStr.slice(0, cursorInputPos) + '\n' + inputStr.slice(cursorInputPos);
+      cursorInputPos++;
+      fullUpdate(); return;
+    }
+    if (!DICT[ch]) { showTip('Keep typing in virtual notation! Your output gets auto-converted.'); return; }
+    saveHistory();
+    deleteSelectedTokens();
+    inputStr = inputStr.slice(0, cursorInputPos) + ch + inputStr.slice(cursorInputPos);
+    cursorInputPos++;
+    fullUpdate();
+  }
+});
+
+// ── Click snapping ────────────────────────────────────────────────────────────
+ubox.addEventListener('click', e => {
+  if (e.shiftKey) return;
+  // If the user drag-selected, preserve the selection so Backspace/Delete can act on it
+  if (ubox.selectionStart !== ubox.selectionEnd) return;
+  cursorInputPos = outCursorToInputPos(ubox.selectionStart, currentOutPositions, inputStr.length);
+  renderUbox();
+});
+
+// ── Global type-to-focus ──────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (document.activeElement === ubox) return;
+  if (e.ctrlKey || e.metaKey) { handleCtrl(e); return; }
+  if (e.altKey) return;
+  if (e.key.length !== 1) return;
+  e.preventDefault();
+  ubox.focus();
+  ubox.dispatchEvent(new KeyboardEvent('keydown', { key: e.key, bubbles: true, cancelable: true }));
+}, { capture: true });
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+fullUpdate();
+</script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

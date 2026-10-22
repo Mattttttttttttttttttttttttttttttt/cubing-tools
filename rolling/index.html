@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rolling Average List — Cubetools</title>
+  <meta name="description" content="Extract all rolling averages of a chosen length from your session as a list.">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/rolling/">
+  <meta property="og:title" content="Rolling Average List — Cubetools">
+  <meta property="og:description" content="Extract all rolling averages of a chosen length from your session as a list.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/rolling/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Rolling Average List — Cubetools">
+  <meta name="twitter:description" content="Extract all rolling averages of a chosen length from your session as a list.">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="../shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+  <style>
+    #paste {field-sizing:content;resize:none;min-height:8lh;}
+    .avg-item { display:flex;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px solid var(--border); font-family:var(--font-mono);font-size:0.8rem; }
+    .avg-item:last-child{border-bottom:none}
+    .avg-idx{color:var(--text-muted);font-size:0.7rem;width:28px;flex-shrink:0;text-align:right}
+    .avg-val{color:#e1e1e1;flex:1;word-break:break-word}
+    .avg-val.dnf{color:#c41e3a88}
+    .avg-val.worst{color:#888}
+    /* solve breakdown spans inside .avg-val */
+    .avg-val .s-trimmed { color:var(--text-muted); }
+    .avg-val .s-fastest { color:var(--best);font-weight:600; }
+    .avg-val .s-normal  { color:var(--text); }
+    .avg-val .s-dnf     { color:#c41e3a88; }
+    .avg-val .avg-result  { color:#b9d9dd;font-weight:600; }
+    .avg-val .avg-result.best  { color:var(--best);font-weight:600; }
+    .avg-val .avg-result.worst { color:var(--worst); }
+    .avg-val .avg-result.dnf   { color:#c41e3a88; }
+    .avg-val .avg-eq { color:var(--text-muted); }
+    .summary{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px}
+    .summary-row{display:flex;justify-content:space-between;font-size:0.8rem;padding:3px 0}
+    .summary-key{color:var(--text-muted);}
+    .summary-best{font-family:var(--font-mono);color:var(--best);}
+    .summary-worst{font-family:var(--font-mono);color:var(--worst);}
+    .summary-tot{font-family:var(--font-mono);color:var(--text-dim);}
+    #copyBtn{margin-bottom:10px}
+    #resetBtn { margin-bottom: 10px; width: 100%; justify-content: center; }
+  </style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="page">
+  <div class="split">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot"></span>Rolling Average List</div>
+        <div class="panel-sub">split a session into all rolling sub-averages</div>
+      </div>
+      <button class="btn btn-ghost" id="resetBtn">↺ Reset <kbd>Shift+Esc</kbd></button>
+      <div class="input-group">
+        <label class="label" for="paste">input</label>
+        <textarea id="paste" rows="8" placeholder="your FULL cstimer average, or a comma-separated list of solves"></textarea>
+        <div id="formatBadge" class="format-badge" style="display:none">Invalid format — paste a cstimer average or comma-separated times</div>
+      </div>
+      <div class="input-group">
+        <label class="label">Sub-average length</label>
+        <input type="number" id="avgLen" min="3" placeholder="e.g. 5" style="width:90px">
+        <div id="errMsg" class="format-badge" style="min-height:16px"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot" style="background:#555"></span>Output</div>
+        <div class="panel-sub">your rolling averages</div>
+        <div id="countLabel" class="panel-sub"></div>
+      </div>
+      <button class="btn btn-ghost" id="copyBtn" style="display:none;justify-content:center;">Copy result <kbd>Ctrl+C</kbd></button>
+      <div id="summary" style="display:none"></div>
+      <div class="scrollable" id="listOut">
+        <div class="output-empty">Results will appear here.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module">
+
+import { buildNav } from '../shared/nav.js';
+import { noBrackets, noMultiphase, minutes, seconds, ndnf, avg, parsePaste,
+  isTimeList, isCstimerFormat, avgStr, avgCompare, frwrd, numPart } from '../shared/helpers.js';
+
+buildNav('rolling');
+
+const STORAGE_KEY = 'cube-tool-solves';
+const RESET_HTML = '↺ Reset <kbd>Shift+Esc</kbd>';
+const UNDO_HTML  = '↩ Undo <kbd>Ctrl+Z</kbd>';
+const resetBtn = document.getElementById('resetBtn');
+let undoMode = false;
+let resetPagehideHandler = null;
+
+function enterUndoMode() {
+  undoMode = true;  resetBtn.innerHTML = UNDO_HTML;
+  resetPagehideHandler = () => localStorage.removeItem(STORAGE_KEY);
+  window.addEventListener('pagehide', resetPagehideHandler);
+}
+function exitUndoMode()  {
+  undoMode = false; resetBtn.innerHTML = RESET_HTML;
+  if (resetPagehideHandler) {
+    window.removeEventListener('pagehide', resetPagehideHandler);
+    resetPagehideHandler = null;
+  }
+}
+
+function clearResults() {
+  document.getElementById('listOut').innerHTML = '<div class="output-empty">Results will appear here.</div>';
+  document.getElementById('summary').style.display = 'none';
+  document.getElementById('countLabel').textContent = '';
+  document.getElementById('copyBtn').style.display = 'none';
+}
+
+function triggerReset() {
+  if (undoMode) return;
+  localStorage.setItem(STORAGE_KEY, pasteEl.value);
+  pasteEl.value = '';
+  formatBadge.style.display = 'none';
+  clearResults();
+  enterUndoMode();
+}
+
+function triggerUndo() {
+  if (!undoMode) return;
+  const stored = localStorage.getItem(STORAGE_KEY) ?? '';
+  pasteEl.value = stored;
+  pasteEl.dispatchEvent(new Event('input'));
+  exitUndoMode();
+}
+
+resetBtn.addEventListener('click', () => undoMode ? triggerUndo() : triggerReset());
+document.getElementById('avgLen').addEventListener('input', compute);
+
+// ── Format validation ─────────────────────────────────────────────────────────
+function isValidTime(s) {
+  return /^[\d:.]+$/.test(s.trim());
+}
+
+const pasteEl      = document.getElementById('paste');
+const formatBadge  = document.getElementById('formatBadge');
+
+pasteEl.addEventListener('input', () => {
+  const text = pasteEl.value;
+  if (!text.trim()) { formatBadge.style.display = 'none'; clearResults(); return; }
+  const valid = isCstimerFormat(text) || isTimeList(text);
+  formatBadge.style.display = valid ? 'none' : '';
+  compute();
+});
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+const copyBtn = document.getElementById('copyBtn');
+const COPY_FLASH_COLOR = '#4a9e6b';
+
+function triggerCopy() {
+  if (copyBtn.style.display === 'none') return;
+  navigator.clipboard.writeText(copyBtn.dataset.result ?? '');
+  const old = copyBtn.innerHTML;
+  copyBtn.textContent = 'Copied!';
+  copyBtn.style.color = COPY_FLASH_COLOR;
+  copyBtn.style.borderColor = COPY_FLASH_COLOR;
+  setTimeout(() => {
+    copyBtn.innerHTML = old;
+    copyBtn.style.color = '';
+    copyBtn.style.borderColor = '';
+  }, 1500);
+}
+
+copyBtn.addEventListener('click', triggerCopy);
+
+// Ctrl+C → copy result when nothing is selected; Shift+Esc → reset; Ctrl+Z → undo
+document.addEventListener('keydown', e => {
+  if (e.shiftKey && e.key === 'Escape') { e.preventDefault(); triggerReset(); return; }
+  if (e.ctrlKey && e.key === 'z') { if (undoMode) { e.preventDefault(); triggerUndo(); } return; }
+  if (!e.ctrlKey || e.key !== 'c') return;
+  if (copyBtn.style.display === 'none') return;
+  const active = document.activeElement;
+  const hasInputSel = active &&
+    (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+    active.selectionStart !== active.selectionEnd;
+  const hasTextSel = (window.getSelection()?.toString().length ?? 0) > 0;
+  if (!hasInputSel && !hasTextSel) {
+    e.preventDefault();
+    triggerCopy();
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+const _stored = localStorage.getItem(STORAGE_KEY);
+if (_stored) { pasteEl.value = _stored; pasteEl.dispatchEvent(new Event('input')); }
+
+// ── Solve span renderer (matches average.html style) ─────────────────────────
+function renderSolveSpans(solves) {
+  return solves.map(s => {
+    const isTrimmed = s.startsWith('(') && s.endsWith(')');
+    const isFastest = s.startsWith('**') && s.endsWith('**');
+    const isDnf     = s.includes('DNF');
+    let cls = 's-normal', inner = s;
+    if (isTrimmed) { cls = 's-trimmed'; }
+    if (isFastest) { inner = s.slice(2, -2); cls = 's-fastest'; }
+    if (isDnf && !isTrimmed) { cls = 's-dnf'; }
+    return `<span class="${cls}">${inner}</span>`;
+  }).join(', ');
+}
+
+function compute() {
+  const raw = pasteEl.value;
+  const errMsg = document.getElementById('errMsg');
+  errMsg.textContent = '';
+  function error() { errMsg.textContent = 'Paste a valid cstimer average.'; }
+  const n = parseInt(document.getElementById('avgLen').value);
+  if (!raw.trim() || isNaN(n)) { clearResults(); return; }
+  if (n < 3) { errMsg.textContent = 'Minimum length is 3.'; clearResults(); return; }
+
+  const result = parsePaste(raw);
+  if (!result) { error(); return; }
+  const {decimals, length, r, timeList} = result;
+  localStorage.setItem(STORAGE_KEY, timeList.map(t => {
+    let s = t; if (s.startsWith('(') && s.endsWith(')')) s = s.slice(1, -1); return s;
+  }).join(', '));
+
+  const results = [];
+  for (let i = 0; i <= length - n; i++) {
+    const slice = frwrd(r, i, n);
+    let val = avg(slice, n, decimals);
+    const display = avgStr(n, slice);
+    results.push({
+      val: val === Number.MAX_SAFE_INTEGER ? 'DNF' : val,
+      display   // { avg: string, solves: string[] }
+    });
+  }
+
+  // Find best/worst non-DNF
+  const nonDnf = results.filter(x => x.val !== 'DNF' && x.val !== Number.MAX_SAFE_INTEGER);
+  const bestVal = nonDnf.length ? Math.min(...nonDnf.map(x => avgCompare(x.val))) : null;
+  const worstVal= nonDnf.length ? Math.max(...nonDnf.map(x => avgCompare(x.val))) : null;
+
+  // Summary
+  const summaryEl = document.getElementById('summary');
+  if (bestVal !== null) {
+    summaryEl.style.display = '';
+    summaryEl.className = 'summary';
+    summaryEl.innerHTML = `
+      <div class="summary-row"><span class="summary-key">Best ao${n}</span><span class="summary-best">${seconds(String(bestVal))}</span></div>
+      <div class="summary-row"><span class="summary-key">Worst ao${n}</span><span class="summary-worst">${seconds(String(worstVal))}</span></div>
+      <div class="summary-row"><span class="summary-key">Total</span><span class="summary-tot">${results.length} rolling averages</span></div>`;
+  } else { summaryEl.style.display = 'none'; }
+
+  document.getElementById('countLabel').textContent = `${results.length} ao${n}s from ${length} solves`;
+
+  const listOut = document.getElementById('listOut');
+  listOut.innerHTML = results.map((x, i) => {
+    const isBest  = x.val !== 'DNF' && x.val === bestVal;
+    const isWorst = x.val !== 'DNF' && x.val === worstVal && x.val !== bestVal;
+    const isDnf   = x.val === 'DNF';
+    const rowCls  = isBest ? 'best' : isWorst ? 'worst' : isDnf ? 'dnf' : '';
+    const resCls  = `avg-result${rowCls ? ' ' + rowCls : ''}`;
+    const avgDisp = x.display.avg;
+    const solvesHtml = renderSolveSpans(x.display.solves);
+    return `<div class="avg-item">` +
+      `<span class="avg-idx">${i + 1}</span>` +
+      `<span class="avg-val ${rowCls}">` +
+        `<span class="${resCls}">${avgDisp}</span>` +
+        `<span class="avg-eq"> = </span>` +
+        solvesHtml +
+      `</span>` +
+    `</div>`;
+  }).join('');
+
+  // Copy button — unchanged: uses avg() values
+  copyBtn.dataset.result = results.map(x => x.val === 'DNF' ? 'DNF' : seconds(String(x.val))).join(', ');
+  copyBtn.style.display = '';
+}
+</script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>

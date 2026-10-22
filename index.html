@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cubetools</title>
+  <meta name="description" content="a collection of much-needed cubing tools">
+  <meta name="author" content="Matt Mao">
+  <link rel="canonical" href="https://matt-meow.web.app/tools/">
+  <meta property="og:title" content="Cubetools">
+  <meta property="og:description" content="a collection of much-needed cubing tools">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://matt-meow.web.app/tools/">
+  <meta property="og:site_name" content="matt meow&#39;s corner">
+  <meta property="og:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Cubetools">
+  <meta name="twitter:description" content="a collection of much-needed cubing tools">
+  <meta name="twitter:image" content="https://matt-meow.web.app/icons/icon-512.png">
+  <link rel="stylesheet" href="shared/style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="../icons/favicon-32.png">
+</head>
+<body>
+  <div id="nav"></div>
+
+  <div class="page">
+    <div class="hero">
+      <h1 class="hero-title">cubing <em>tools</em></h1>
+      <p class="hero-desc">Made these for funsies, but you are probably looking for one of them.</p>
+    </div>
+
+    <div class="tool-grid" id="toolGrid"></div>
+
+    <footer>
+      <span>made by <span style="color:var(--accent)">matt</span></span>
+      <span class="footer-sep">·</span>
+      <span style="color:var(--border-2)">heheheheheheheh :3</span>
+    </footer>
+  </div>
+
+  <script type="module">
+    import { TOOLS, buildNav } from './shared/nav.js';
+
+    buildNav(null);
+
+    const descs = {
+      average: 'Format any length of averages. Useful for online comps or compact sharing.',
+      stats:   'Get stats for your session. Calculate best single and any rolling averages; count DNFs, +2s, and time distributions.',
+      subx:    'Count how many solves or rolling averages in a session are sub a given cutoff time.',
+      "3x3":   'Convert 3x3 natural notation, aka virtual cube typing, into WCA notation.',
+      oblp:    'Trainer for OBLP visual. Thanks SAC2 for the design of the squan!',
+      squan:   'Generate all variants of one or more squan algs and rank them for you. Apply y2s, karnify, and check for bad finishes.',
+      mean:    'Format any length of means. Useful for online comps or compact sharing.',
+      add:     'Add together any number of times in any format, even if minutes are involved.',
+      filter:  'Filter cube explorer output by making your own rules!',
+      rolling: 'Extract all rolling averages of a chosen length from your session as a list.',
+      mega:    'Convert mega scrambles from carrot to WCA.',
+    };
+
+    const tags = {
+      average: 'formatter', stats: 'calculate', rolling: 'helper',
+      subx: 'calculate', mean: 'calculate', add: 'calculate',
+      filter: 'helper', mega: 'formatter', squan: 'helper',
+      oblp: 'trainer', "3x3": 'formatter'
+    };
+
+    const grid = document.getElementById('toolGrid');
+    TOOLS.forEach(t => {
+      const a = document.createElement('a');
+      a.className = 'tool-card';
+      a.href = `${t.path}/`;
+      a.style.setProperty('--tool-color', t.color);
+      a.innerHTML = `
+        <div class="card-name">${t.longLabel}</div>
+        <div class="card-desc">${descs[t.path] ?? ''}</div>
+        <div class="card-tag">${tags[t.path] ?? ''}</div>`;
+      grid.appendChild(a);
+    });
+  </script>
+  <script>
+  // Register the shared service worker (scope "/") so this page works offline
+  // on its own, even if you never visited the parent site. Content stays fresh
+  // because the SW is network-first whenever you're online.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>
