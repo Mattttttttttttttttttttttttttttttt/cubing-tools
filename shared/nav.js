@@ -1,5 +1,6 @@
 // nav.js — injects the shared nav into any page
 // Usage: import './nav.js' and call buildNav(activePath)
+import { trapModal } from './a11y.js';
 
 export const TOOLS = [
   { path: 'average', label: 'Avg',          longLabel: 'Average Generator',    color: '#ff85a1' },
@@ -85,6 +86,7 @@ export function buildNav(activePath) {
   const openBtn  = document.getElementById('aboutBtn');
   const closeBtn = document.getElementById('aboutClose');
   const inner    = document.getElementById('aboutModalInner');
+  const trap     = trapModal(modal, { close: closeModal });
 
   function openModal() {
     const sw = window.innerWidth - document.documentElement.clientWidth;
@@ -92,9 +94,11 @@ export function buildNav(activePath) {
     nav.style.paddingRight = sw + 'px';
     document.body.style.overflow = 'hidden';
     modal.classList.add('open');
+    trap.activate();
   }
   function closeModal() {
     modal.classList.remove('open');
+    trap.release();
     modal.addEventListener('transitionend', () => {
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
@@ -105,7 +109,6 @@ export function buildNav(activePath) {
   openBtn.addEventListener('click', openModal);
   closeBtn.addEventListener('click', closeModal);
   modal.addEventListener('click', e => { if (!inner.contains(e.target)) closeModal(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
   // ── Center the active nav button on load (matters on mobile where the
   //    nav scrolls horizontally) ──

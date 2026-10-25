@@ -244,6 +244,7 @@
 
 <script type="module">
 import { buildNav } from '../shared/nav.js';
+import { trapModal } from '../shared/a11y.js';
 buildNav('filter');
 
 const LS_KEY = 'cube-tool-filters';
@@ -663,6 +664,7 @@ const fpErrorEl   = document.getElementById('fpError');
 const fpErrorSpc  = document.getElementById('fpErrorSpacer');
 const fpNum       = document.getElementById('fpNum');
 const fpSaveBtn   = document.getElementById('fpSave');
+const fpTrap      = trapModal(fpOverlay, { close: closePopup, initialFocus: fpEditor });
 
 let activePopupIdx = -1;
 let lastToks       = [];
@@ -687,6 +689,7 @@ function openPopup(idx) {
     if (errs.length) showErrorBadge(errs[0]);
   }
   fpOverlay.classList.add('open');
+  fpTrap.activate();
     requestAnimationFrame(()=>{
     fpEditor.focus();
     refreshDisplay(fpEditor.selectionStart??0);
@@ -703,6 +706,7 @@ function saveAndClose() {
 
 function closePopup() {
   fpOverlay.classList.remove('open');
+  fpTrap.release();
   activePopupIdx=-1;
   clearTimeout(errorTimer);
 }
@@ -756,7 +760,6 @@ fpSaveBtn.addEventListener('click', saveAndClose);
 // Ctrl+Enter inside popup → save
 fpOverlay.addEventListener('keydown', e=>{
   if (e.ctrlKey&&e.key==='Enter') { e.preventDefault(); saveAndClose(); }
-  if (e.key==='Escape')           { e.preventDefault(); closePopup(); }
 });
 
 // Name field: update popup title live

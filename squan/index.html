@@ -94,7 +94,6 @@
     }
 
     .alg-text {
-      flex: 1;
       user-select: text;
     }
 
@@ -157,7 +156,7 @@
       pointer-events: none;
       font-style: normal;
     }
-    .alg-row:hover .alg-tip { display: block; }
+    .alg-text:hover .alg-tip { display: block; }
 
     /* chevron */
     .chevron {
@@ -196,6 +195,24 @@
     }
 
     /* ── Derive button spinner ── */
+    @keyframes expandIn {
+      from { opacity: 0; translate: 0 -5px; }
+      to   { opacity: 1; translate: 0 0; }
+    }
+
+    /* expanded variant container — animated, left-accented */
+    .alg-group-body {
+      animation: expandIn .16s ease;
+      border-left: 2px solid color-mix(in srgb, var(--accent) 22%, transparent);
+      margin: 0 0 6px 12px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    .alg-group-body .alg-row {
+      padding-left: 6px;
+      background: transparent;
+    }
+
     @keyframes spin {
       to {
         transform: rotate(360deg);
@@ -602,7 +619,7 @@
     const CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.29289 8.29289C4.68342 7.90237 5.31658 7.90237 5.70711 8.29289L12 14.5858L18.2929 8.29289C18.6834 7.90237 19.3166 7.90237 19.7071 8.29289C20.0976 8.68342 20.0976 9.31658 19.7071 9.70711L12.7071 16.7071C12.3166 17.0976 11.6834 17.0976 11.2929 16.7071L4.29289 9.70711C3.90237 9.31658 3.90237 8.68342 4.29289 8.29289Z" fill="currentColor"/></svg>`;
 
     function renderGroup(el, g) {
-      el.innerHTML = ''; 
+      el.innerHTML = '';
       const top = g.variants[0];
       if (!top) return;
       const hasMore = g.variants.length > 1;
@@ -622,15 +639,15 @@ ${buildInner(top.alg, 'top-multi', top.rating, top.phase1, top.phase2, top.phase
       el.appendChild(topRow);
 
       if (g.expanded && hasMore) {
-        let html = "";
+        let inner = '';
         for (let i = 1; i < g.variants.length; i++) {
           const v = g.variants[i];
-          html += `<div class="alg-row" style="background:color-mix(in srgb,var(--surface) 60%,transparent)">
+          inner += `<div class="alg-row">
               <span class="indent"></span>
               ${buildInner(v.alg, 'variant', v.rating, v.phase1, v.phase2, v.phase3, v.phase4)}
             </div>`;
         }
-        el.insertAdjacentHTML('beforeend', html);
+        el.insertAdjacentHTML('beforeend', `<div class="alg-group-body">${inner}</div>`);
       }
     }
 
