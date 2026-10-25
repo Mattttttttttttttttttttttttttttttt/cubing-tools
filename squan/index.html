@@ -38,6 +38,10 @@
       resize: none;
     }
 
+    .split > .panel:last-child {
+      scrollbar-gutter: stable;
+    }
+
     /* ── Config ── */
     .config-row {
       display: flex;
@@ -62,12 +66,13 @@
 
     /* ── Result rows ── */
     .alg-row {
+      position: relative;
       font-family: var(--font-mono);
       /* algs use raw notation (| - / \) — ligatures would fuse e.g. "|-" → "├─" */
       font-variant-ligatures: none;
       font-feature-settings: "liga" 0, "calt" 0;
       font-size: .82rem;
-      padding: 6px 2px;
+      padding: 6px 6px 2px;
       border-bottom: 1px solid var(--border);
       word-break: break-all;
       display: flex;
@@ -131,8 +136,30 @@
       user-select: text;
     }
 
-    /* chevron — never selectable; sized to one alg line so the icon centers
-       vertically on the first line of the alg (which may wrap) */
+    /* score breakdown tooltip */
+    .alg-tip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 0;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--text-dim);
+      line-height: 1.6;
+      width: 230px;
+      z-index: 50;
+      pointer-events: none;
+      font-style: normal;
+    }
+    .alg-row:hover .alg-tip { display: block; }
+
+    /* chevron */
     .chevron {
       flex-shrink: 0;
       width: 24px;
@@ -390,13 +417,9 @@
     // ── M/m/e substitution ──
 
     // An interior diagonal move (x,x) with |x| ∈ {1,2,3} (i.e. an M/m/e move)
-    // can be rewritten as x,x/-x,-x/x,x and merged into its neighbours: negate
-    // the move and add (x,x) to the moves on either side. This is the "other M"
-    // — same effect on the cube, different fingers. Candidates are every interior
-    // move (one between two slices), i.e. 1 ≤ i ≤ n-2; a candidate next to a
-    // boundary merges (x,x) into that boundary misalign move, which is still an
-    // equivalent move sequence. 4/5 are skipped (they are y2s of 2/1) and 6 is
-    // meaningless.
+    // can be rewritten as x,x/-x,-x/x,x and merged into its neighbors.
+    // Candidates are every interior move.
+    // A candidate next to a boundary merges (x,x) into preABF/postABF.
     function mMoveVariants(numericAlg) {
       const segs = numericAlg.split('/').map(s => s.trim());
       const n = segs.length;
@@ -404,7 +427,7 @@
       const cands = [];
       for (let i = 1; i <= n - 2; i++) {
         const [a, b] = squanLib.addCommas(segs[i] || '0,0').split(',').map(Number);
-        if (a === b && Math.abs(a) >= 1 && Math.abs(a) <= 3) cands.push(i);
+        if (a === b && Math.abs(a) >= 1 && Math.abs(a) <= 5) cands.push(i);
       }
       if (!cands.length) return [numericAlg];
 
@@ -414,7 +437,6 @@
       for (let mask = 0; mask < total; mask++) {
         const arr = segs.slice();
         // apply substitutions left-to-right; each uses the move's current value
-        // (additions keep diagonal moves diagonal, so the identity still holds)
         for (let k = 0; k < cands.length; k++) {
           if (!(mask & (1 << k))) continue;
           const i = cands[k];
@@ -429,8 +451,7 @@
       return variants;
     }
 
-    // Recompute the (bad finish)/(alignment changes in CS) notes for a numeric
-    // variant — mirrors applyY2s so substituted variants get correct notes.
+    // Recompute the (bad finish)/(alignment changes in CS) notes for a numeric variant.
     function deriveComment(numericAlg) {
       const segs = numericAlg.split('/');
       const firstMove = segs[0];
@@ -450,64 +471,59 @@
       const groups = [];
       const errors = [];
 
-      // dedupe input lines by canonical form
-      const seenCanon = new Set();
-      const uniqueLines = [];
+      // dedupe input lines
+      const variants = []; // 2D array; `i`th element is the variants of `line[i]`
       for (const line of lines) {
-        const canon = canonical(line, karnB);
-        if (!seenCanon.has(canon)) {
-          seenCanon.add(canon);
-          uniqueLines.push(line);
-        }
-      }
-
-      for (const line of uniqueLines) {
+        let v = [];
         // base parse with no y2s — if this throws, the input line itself is bad,
         // so surface the real reason instead of guessing.
         try {
           squanLib.applyY2s(line, [], karnB);
         } catch (e) {
           errors.push(describeError(e, line));
+          v.push(null);
           continue;
         }
 
+        if (variants.flat().includes(squanLib.applyY2s(line, [], karnB))) continue; // skip dupes
+
         const numPos = squanLib.countY2Positions(line);
         const total = 1 << numPos;          // 2^numPos
+        for (let mask = 0; mask < total; mask++) {
+          const lfLst = [];
+          // from 0 all the way to alst.length - 3
+          for (let bit = 0; bit < numPos; bit++) if (mask & (1 << bit)) lfLst.push(bit);
+          const numericAlg = squanLib.applyY2s(line, lfLst, false)
+            .replace(/ \(bad finish\)| \(alignment changes in CS\)/g, '').trim();
+          // On top of the y2 variant, also try "the other M/m/e".
+          for (const mme of mMoveVariants(numericAlg)) v.push(mme);
+        }
+        variants.push(v);
+      }
+
+      for (const [i, vList] of variants.entries()) {
         const seen = new Map();            // result string → best score
 
         // match applyY2s's karn-output decision so substituted variants are
         // emitted in the same format
-        const kOut = karnB === null ? squanLib.isKarn(line) : karnB;
+        const kOut = karnB === null ? /[b-z]/i.test(lines[i]) : karnB;
 
-        // Every combo is a layer-flip of an alg we already proved parses, so none
-        // should fail. If one does, it's a real bug — let it propagate to the
-        // top-level handler rather than hiding it.
-        for (let mask = 0; mask < total; mask++) {
-          const lfLst = [];
-          for (let bit = 0; bit < numPos; bit++) if (mask & (1 << bit)) lfLst.push(bit + 1);
-          const result = squanLib.applyY2s(line, lfLst, karnB);
-          const algOnly = result.replace(/ \(bad finish\)| \(alignment changes in CS\)/g, '').trim();
-          const numericBase = squanLib.isKarn(algOnly) ? squanLib.unkarnify(algOnly) : algOnly;
+        for (const v of vList) {
+          const { score, sliceStart, phase1, phase2, phase3, phase4 } = squanLib.rateAlg(v);
+          const comment = deriveComment(v);
+          const out = kOut ? squanLib.karnify(v) : v;
 
-          // On top of the y2 variant, also try the "other M/m/e": each interior
-          // diagonal move can be swapped for its equivalent form, so enumerate
-          // all combos and treat each as its own variant.
-          for (const numVar of mMoveVariants(numericBase)) {
-            const { score, sliceStart } = squanLib.rateAlg(numVar);
-            const comment = deriveComment(numVar);
-            const out = kOut ? squanLib.karnify(numVar) : numVar;
-
-            // rateAlg recommends a starting slice direction — inject it via the
-            // lib (without the comment, then re-attach it) so it isn't lost.
-            const display = ['/', '\\', '|'].includes(sliceStart)
-              ? squanLib.injectSliceStart(out, sliceStart) + comment
-              : out + comment;
-            if (!seen.has(display) || score > seen.get(display)) seen.set(display, score);
-          }
+          // rateAlg recommends a starting slice direction — inject it via the
+          // lib (without the comment, then re-attach it) so it isn't lost.
+          const display = ['/', '\\', '|'].includes(sliceStart)
+            ? squanLib.injectSliceStart(out, sliceStart) + comment
+            : out + comment;
+          if (!seen.has(display) || score > seen.get(display).score)
+            seen.set(display, { score, phase1, phase2, phase3, phase4 });
         }
 
         const sorted = [...seen.entries()]
-          .map(([alg, score]) => ({ alg, score }))
+          .map(([alg, d]) => ({ alg, score: d.score, phase1: d.phase1, phase2: d.phase2, phase3: d.phase3, phase4: d.phase4 }))
           .sort((a, b) => b.score - a.score);
         groups.push({ variants: sorted, expanded: false });
       }
@@ -532,7 +548,7 @@
 
       if (!groups.length) {
         sub.textContent = '';
-        out.innerHTML = '<div class="output-empty">No valid algs to derive — see the error badge.</div>';
+        out.innerHTML = '<div class="output-empty">No valid algs to derive.</div>';
         document.getElementById('copyBtn').style.display = 'none';
         return;
       }
@@ -542,7 +558,7 @@
         const n = groups[0].variants.length;
         sub.textContent = `${n} variant${n !== 1 ? 's' : ''} generated${n > 1 ? ', ranked by approximate relative ergonomics' : ''}`;
       } else {
-        const skipped = lines.length - uniqueLines.length;
+        const skipped = lines.length - variants.length;
         const parts = [];
         if (skipped > 0) parts.push(`${skipped} duplicate${skipped !== 1 ? 's' : ''} removed`);
         if (errors.length) parts.push(`${errors.length} invalid`);
@@ -567,7 +583,7 @@
       if (isSingle) {
         const g = groups[0];
         out.innerHTML = g.variants.map((v, i) =>
-          `<div class="alg-row">${i === 0 ? '' : '<span class="indent"></span>'}${buildInner(v.alg, i === 0 ? 'top-single' : 'variant', v.rating)}</div>`
+          `<div class="alg-row">${i === 0 ? '' : '<span class="indent"></span>'}${buildInner(v.alg, i === 0 ? 'top-single' : 'variant', v.rating, v.phase1, v.phase2, v.phase3, v.phase4)}</div>`
         ).join('');
         return;
       }
@@ -577,11 +593,6 @@
       for (const g of groups) {
         const wrap = document.createElement('div');
         renderGroup(wrap, g);
-        wrap.addEventListener('click', () => {
-          if ((window.getSelection()?.toString().length ?? 0) > 0) return;
-          g.expanded = !g.expanded;
-          renderGroup(wrap, g);
-        });
         frag.appendChild(wrap);
       }
       out.appendChild(frag);
@@ -591,31 +602,40 @@
     const CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.29289 8.29289C4.68342 7.90237 5.31658 7.90237 5.70711 8.29289L12 14.5858L18.2929 8.29289C18.6834 7.90237 19.3166 7.90237 19.7071 8.29289C20.0976 8.68342 20.0976 9.31658 19.7071 9.70711L12.7071 16.7071C12.3166 17.0976 11.6834 17.0976 11.2929 16.7071L4.29289 9.70711C3.90237 9.31658 3.90237 8.68342 4.29289 8.29289Z" fill="currentColor"/></svg>`;
 
     function renderGroup(el, g) {
+      el.innerHTML = ''; 
       const top = g.variants[0];
-      if (!top) { el.innerHTML = ''; return; }
+      if (!top) return;
       const hasMore = g.variants.length > 1;
       const chevron = hasMore
         ? `<span class="chevron${g.expanded ? ' up' : ''}" aria-hidden="true">${CHEVRON_SVG}</span>`
         : `<span class="chevron" aria-hidden="true"></span>`;
 
-      let html = `<div class="alg-row clickable">
-      ${chevron}
-      ${buildInner(top.alg, 'top-multi', top.rating)}
-    </div>`;
+      const topRow = document.createElement("div");
+      topRow.classList.add("alg-row", "clickable")
+      topRow.innerHTML = `${chevron}
+${buildInner(top.alg, 'top-multi', top.rating, top.phase1, top.phase2, top.phase3, top.phase4)}`;
+      topRow.addEventListener('click', () => {
+        if ((window.getSelection()?.toString().length ?? 0) > 0) return;
+        g.expanded = !g.expanded;
+        renderGroup(el, g);
+      });
+      el.appendChild(topRow);
 
       if (g.expanded && hasMore) {
+        let html = "";
         for (let i = 1; i < g.variants.length; i++) {
+          const v = g.variants[i];
           html += `<div class="alg-row" style="background:color-mix(in srgb,var(--surface) 60%,transparent)">
               <span class="indent"></span>
-              ${buildInner(g.variants[i].alg, 'variant', g.variants[i].rating)}
+              ${buildInner(v.alg, 'variant', v.rating, v.phase1, v.phase2, v.phase3, v.phase4)}
             </div>`;
         }
+        el.insertAdjacentHTML('beforeend', html);
       }
-      el.innerHTML = html;
     }
 
     // algs with (bad finish) / (alignment changes) are always gray+italic
-    function buildInner(algStr, textCls, score) {
+    function buildInner(algStr, textCls, score, phase1, phase2, phase3, phase4) {
       const hasBF = algStr.includes('(bad finish)');
       const hasAC = algStr.includes('(alignment changes in CS)');
       const hasNote = hasBF || hasAC;
@@ -629,7 +649,18 @@
         const r = Math.round(score) || 0;   // collapse -0 → 0
         rating = ` (${r > 0 ? '+' : ''}${r})`;
       }
-      return `<span class="alg-text ${cls}">${esc(algPart + rating)}</span>` +
+      let tip = '';
+      if (Number.isFinite(phase1)) {
+        const total = Math.round(phase1 - phase2 - phase3 + phase4);
+        tip = `<span class="alg-tip">` +
+          `total score = ${total}<br>` +
+          `ergonomics score: ${Math.round(phase1)}<br>` +
+          `slice count score: -${Math.round(phase2)}<br>` +
+          `overwork score: -${Math.round(phase3)}<br>` +
+          `canceling moves score: ${Math.round(phase4)}` +
+          `</span>`;
+      }
+      return `<span class="alg-text ${cls}">${esc(algPart + rating)}${tip}</span>` +
         (hasNote ? `<span class="alg-note">${esc(notes.join(' '))}</span>` : '');
     }
 

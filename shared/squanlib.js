@@ -80,10 +80,12 @@ export default class SquanLib {
         "jn": "D4'", "nj": "U4",
         "jj": "U e' D", "bjj+e2": "U' e' U'",
         "-nn": "E' E",
-        "-jn": "D4", "-nj": "D4'",
+        "-jn": "D4", "-nj": "U4'",
         // ── alignment-dependent ───────────────────────────────────────────────
         "bpj10": "d m' U", "bpj0-1": "u' m D'",
         "fpj10": "u m' D", "fpj0-1": "d' m U'",
+        "e2bpj10": "d 44 D", "e2bpj0-1": "u' -4-4 U'",
+        "e2fpj10": "u 44 U", "e2fpj0-1": "d' -4-4 D'",
         "aa10": "u m' u T'", "aa0-1": "U m' U t'",
         "fadj10": "D M' d'", "dadj10": "D M' d'",
         "fadj0-1": "U' M u", "u'adj0-1": "U' M u",
@@ -96,10 +98,11 @@ export default class SquanLib {
         "fv10": "d4", "fv0-1": "d4'",
         "vf10": "u4", "vf0-1": "u4'",
         "y2fv10": "u d' u -5,4",
+        "pñ10": "E m u2'", "pñ0-1": "E m' d2",
         "jf10": "w D' u T'", "jf0-1": "w' D u' T",
         "fj10": "b U' d t", "fj0-1": "b' U d' t'",
-        "jr00": "e' w e", "jr10": "e' b e",
-        "jr0-1": "e' w' e", "jr1-1": "e' b' e",
+        "jr00": "e' w e", "jr10": "e' w e",
+        "jr0-1": "e' b' e", "jr1-1": "e' b' e",
         "rj00": "e b' e'", "rj10": "e w e'",
         "rj0-1": "e b' e'", "rj1-1": "e w e'",
         "jv10": "b D d d2'", "jv0-1": "b' D' d' d2",
@@ -349,13 +352,20 @@ export default class SquanLib {
         "left yoshi": "UL", "right yoshi": "UR"
     };
 
-    static nextAngle = {
+    static nextAngleOBL = {
         // Single character angles
         "-": "-", "/": "\\", "\\": "/", "—": "|", "|": "—",
         "U": "R", "R": "D", "D": "L", "L": "U",
         // Double character angles
         "UR": "DR", "DR": "DL", "DL": "UL", "UL": "UR"
     };
+
+    static nextAnglePBL = {
+        "": "",
+        "F": "L", "L": "B", "B": "R", "R": "F",
+        "FR": "FL", "FL": "BL", "BL": "BR", "BR": "FR",
+        "LR": "FB", "FB": "LR"
+    }
 
     static get HALF_L() { return 6; }
     static get LAYERL() { return 12; }
@@ -595,6 +605,56 @@ export default class SquanLib {
     };
 
     /**
+     * PBLFaces: the baseline hex and angle for each PBL face
+     */
+    static PBLFaces = {
+    "-": { "hex": "AA1BB2CC3DD45EE6FF7GG8HH", "angle": "" },
+    "adj": { "hex": "AA2BB1CC3DD46EE5FF7GG8HH", "angle": "FR" },
+    "al": { "hex": "AA1CC2DD3BB45HH6FF7EE8GG", "angle": "F" },
+    "ar": { "hex": "CC1AA2BB3DD45FF6HH7GG8EE", "angle": "F" },
+    "ba": { "hex": "DD4BB1CC3AA26EE7GG5FF8HH", "angle": "F" },
+    "bm": { "hex": "DD1BB3CC4AA28EE6GG5FF7HH", "angle": "F" },
+    "cl": { "hex": "DD2BB3CC1AA48EE5GG7FF6HH", "angle": "F" },
+    "cr": { "hex": "DD3BB1CC2AA46EE8GG7FF5HH", "angle": "F" },
+    "da": { "hex": "DD2BB4CC3AA17EE5GG6FF8HH", "angle": "F" },
+    "dm": { "hex": "DD1BB4CC2AA37EE6GG8FF5HH", "angle": "F" },
+    "e": { "hex": "BB1AA2DD3CC45FF6EE7HH8GG", "angle": "LR" },
+    "f": { "hex": "DD3BB2CC1AA45EE8GG7FF6HH", "angle": "F" },
+    "gal": { "hex": "DD4BB3CC1AA28EE7GG5FF6HH", "angle": "F" },
+    "gol": { "hex": "DD2BB4CC1AA37EE5GG8FF6HH", "angle": "F" },
+    "gor": { "hex": "DD3BB4CC2AA17EE8GG6FF5HH", "angle": "F" },
+    "gar": { "hex": "DD3BB1CC4AA26EE8GG5FF7HH", "angle": "F" },
+    "h": { "hex": "AA3BB4CC1DD27EE8FF5GG6HH", "angle": "" },
+    "ja": { "hex": "DD4BB2CC3AA15EE7GG6FF8HH", "angle": "F" },
+    "jm": { "hex": "DD1BB2CC4AA35EE6GG8FF7HH", "angle": "F" },
+    "ka": { "hex": "DD4BB3CC2AA18EE7GG6FF5HH", "angle": "F" },
+    "km": { "hex": "DD2BB1CC4AA36EE5GG8FF7HH", "angle": "F" },
+    "m": { "hex": "DD3BB4CC1AA27EE8GG5FF6HH", "angle": "F" },
+    "na": { "hex": "DD4CC3BB2AA18HH7GG6FF5EE", "angle": "" },
+    "nm": { "hex": "DD2CC1BB4AA36HH5GG8FF7EE", "angle": "" },
+    "ol": { "hex": "AA2BB3CC4DD18EE5FF6GG7HH", "angle": "" },
+    "or": { "hex": "AA4BB1CC2DD36EE7FF8GG5HH", "angle": "" },
+    "opp": { "hex": "AA1BB4CC3DD27EE6FF5GG8HH", "angle": "LR" },
+    "pl": { "hex": "DD4BB2CC1AA35EE7GG8FF6HH", "angle": "F" },
+    "pr": { "hex": "DD3BB2CC4AA15EE8GG6FF7HH", "angle": "F" },
+    "pj": { "hex": "DD1BB2CC3AA45EE6GG7FF8HH", "angle": "F" },
+    "pn": { "hex": "AA1DD2CC3BB45GG6FF7EE8HH", "angle": "FR" },
+    "q": { "hex": "DD1CC4BB3AA27HH6GG5FF8EE", "angle": "" },
+    "rl": { "hex": "DD1BB3CC2AA48EE6GG7FF5HH", "angle": "F" },
+    "rr": { "hex": "DD2BB1CC3AA46EE5GG7FF8HH", "angle": "F" },
+    "sa": { "hex": "DD1CC3BB2AA48HH6GG7FF5EE", "angle": "F" },
+    "sm": { "hex": "DD2CC1BB3AA46HH5GG7FF8EE", "angle": "F" },
+    "t": { "hex": "DD1BB4CC3AA27EE6GG5FF8HH", "angle": "F" },
+    "ul": { "hex": "AA3BB2CC4DD15EE8FF6GG7HH", "angle": "F" },
+    "ur": { "hex": "AA4BB2CC1DD35EE7FF8GG6HH", "angle": "F" },
+    "v": { "hex": "CC1BB2AA4DD35EE6HH8GG7FF", "angle": "FR" },
+    "w": { "hex": "AA3BB4CC2DD17EE8FF6GG5HH", "angle": "FR" },
+    "x": { "hex": "DD3CC2BB1AA45HH8GG7FF6EE", "angle": "" },
+    "y": { "hex": "AA1DD2CC4BB35GG6FF8EE7HH", "angle": "FR" },
+    "z": { "hex": "AA2BB1CC4DD36EE5FF8GG7HH", "angle": "FR" }
+}
+
+    /**
      * OBLWeights: the weight factor of OBL faces that are not 4
      */
     static OBLWeights = {
@@ -687,16 +747,6 @@ export default class SquanLib {
     }
 
     /**
-     * isKarn: returns true if the string uses any letters, excluding A and a
-     *
-     * @param {string} str the alg
-     * @returns {boolean} whether the alg contains letters, excluding A and a
-     */
-    isKarn(str) {
-        return /[b-zB-Z]/.test(str);
-    }
-
-    /**
      * getAlignmentMove: turns topA and bottomA into a starting move
      *
      * @param {boolean} topA top misalign?
@@ -738,8 +788,6 @@ export default class SquanLib {
         // " / " → "/"
         alg = alg.replaceAll(/ ([\/\\\|]) /g, "$1")
         if (/[\/\\\|]{2,}/.test(alg)) throw new Error("unkarnifyHelp: Two slices in a row.");
-
-        if (!this.isKarn(alg)) return alg; // not karn at all
 
         // these can be "", if the alg starts/ends with a slice
         let firstMove, lastMove;
@@ -841,7 +889,7 @@ export default class SquanLib {
 
         // early out: no shorthands
         const allKnown = moves.every(m =>
-            !m || !this.isKarn(m) || (' ' + m + ' ' in SquanLib.karnToWCA)
+            !m || (' ' + m + ' ' in SquanLib.karnToWCA)
         );
         if (allKnown) return this.unkarnifyHelp(alg);
 
@@ -1008,7 +1056,8 @@ export default class SquanLib {
      */
     invertScramble(alg) {
         if (!alg) return alg;
-        return this.unkarnify(alg).trim().split('/').reverse().map(part => {
+        const unkarnified = this.unkarnify(alg).trim().replaceAll(/[\\|]/g, "/");
+        return unkarnified.split('/').reverse().map(part => {
             part = part.trim();
             const src = part.includes('(')
                 ? part.match(/\(([^)]+)\)/)?.[1]
@@ -1025,7 +1074,9 @@ export default class SquanLib {
     /**
      * isPBL: check if a hex is PBL
      *
-     * @param {string} hex
+     * @param {Object} hex solved state = 011233455677998bbaddcffe
+     * @param {string} hex.tlHex
+     * @param {string} hex.blHex
      * @returns {boolean} whether it's a PBL
      */
     isPBL(hex) {
@@ -1080,6 +1131,88 @@ export default class SquanLib {
         return true;
     }
 
+    /**
+     * isSpecificPBL: check if an alg is a specific PBL case at the correct angles
+     *
+     * @param {string} alg an alg that SOLVES the case. karn is accepted.
+     * @param {Object} u the top layer PBL face
+     * @param {Object} d the bottom layer PBL face
+     * @param {string} u.face the face name
+     * @param {string} u.angle the face angle
+     * @param {string} d.face the face name
+     * @param {string} d.angle the face angle
+     * @returns {boolean}
+     */
+    isSpecificPBL(alg, u, d) {
+        const hex = this.doMoves(alg, "AA1BB2CC3DD45EE6FF7GG8HH");
+        const uHex = hex.slice(0, 12);
+        const dHex = hex.slice(12);
+        const uAngle = this.getPBLFaceAngle(uHex, u.face, true);
+        if (uAngle !== u.angle) return false;
+        const dAngle = this.getPBLFaceAngle(dHex, d.face, false);
+        return dAngle === d.angle;
+    }
+
+    /**
+     * getPBLFaceAngle: check if a hex is a specific PBL face at an angle
+     *
+     * @param {string} hex hex string for a layer. A-H are corners.
+     * @param {string} face the target face name
+     * @param {boolean} isTop whether the hex is for the top face
+     * @returns {string|null} the angle of the hex given, null if no match
+     */
+    getPBLFaceAngle(hex, face, isTop) {
+        const isAngle = (hex, target) => {
+            for (let i = 1; i <= 4; i++)
+                if (this.colorShift(hex, i) === target) return true;
+            return false;
+        }
+        // fast forward an angle
+        function fastForward(a, j) {
+            if (j > 0) return fastForward(SquanLib.nextAnglePBL[a], j - 1);
+            else return a;
+        }
+        const baseline = SquanLib.PBLFaces[face.toLowerCase()];
+        if (!baseline) throw new Error("getPBLFaceAngle: no such face: " + face);
+        const baseHex = isTop ? baseline.hex.slice(0,12) : baseline.hex.slice(12);
+        const baseAngle = baseline.angle;
+        let result = null;
+        // when you do a -3 move on top and it match <F>, the original angle is <L>,
+        // which is fastForward() once.
+        let move = isTop ? -3 : 3;
+        for (let i = 0; i < 4; i++) {
+            if (isAngle(hex, baseHex)) result = fastForward(baseAngle, i);
+            if (result !== null) return result;
+            // if angleless, exit if no result
+            if (!baseAngle) return null;
+            hex = this.shift(hex, move);
+        }
+        return null;
+    }
+
+    /**
+     * colorShift: shift everything up 1
+     *
+     * @param {string} s layer state. A-H are corners.
+     * @param {number} amount how many time to do the color shift by
+     * @example
+     * colorShift("AA1BB3DD2CC4") // "BB2CC4AA3DD1"
+     */
+    colorShift(s, amount) {
+        const wrap = {
+            "E": "A",
+            "I": "E",
+            "5": "1",
+            "9": "5"
+        }
+        for (let i = 0; i < amount; i++)
+            s = [...s].map(char => {
+                let shiftedChar = String.fromCodePoint(char.codePointAt(0) + 1);
+                return wrap[shiftedChar] ?? shiftedChar;
+            }).join('');
+        return s;
+    }
+
 
     // =========================================================================
     // SECTION 5: KARNIFY  (WCA → karn)
@@ -1102,7 +1235,7 @@ export default class SquanLib {
     karnify(alg) {
         alg = alg.trim();
         if (/[\/\\\|]{2,}/.test(alg)) throw new Error("karnify: Two slices in a row.");
-        if (this.isKarn(alg)) throw new Error("karnify: Alg has letters. Try unkarnifying first.")
+        if (/[b-z]/i.test(alg)) throw new Error("karnify: Alg has letters. Try unkarnifying first.")
         let startsSlice = ["/", "\\", "|"].includes(alg.charAt(0));
         let startingSlice = startsSlice ? alg.charAt(0) : "";
         let endsSlice = "/" === alg.at(-1);
@@ -1373,8 +1506,8 @@ export default class SquanLib {
         // strip brackets e.g. "[7|14]"
         let a = algRaw.replace(/\[.*$/, '').trim();
 
-        // unkarnify if needed
-        const numeric = this.isKarn(a) ? this.unkarnify(a) : a.replaceAll(' ', '');
+        // unkarnify
+        const numeric = this.unkarnify(a);
 
         const rawParts = numeric.split('/');
         // keep leading slice for up/downslice, drop trailing slice
@@ -1414,7 +1547,7 @@ export default class SquanLib {
         const phase1 = W1 * Math.max(ergoUp, ergoDown) / sliceCount; // average move rating
 
         let sliceStart = '|';
-        if (Math.abs(ergoUp - ergoDown) / sliceCount > 5)
+        if (Math.abs(ergoUp - ergoDown) / (sliceCount-1) > 2)
             sliceStart = ergoUp > ergoDown ? '/' : '\\';
 
         const phase2 = W2 * sliceCount;
@@ -1423,7 +1556,8 @@ export default class SquanLib {
         const phase3 = W3 * movement / sliceCount;
         const phase4 = bonus * W5 / sliceCount;
 
-        return { score: phase1 - phase2 - phase3 + phase4 + W4, sliceStart };
+        return { score: phase1 - phase2 - phase3 + phase4 + W4, sliceStart,
+            phase1, phase2, phase3, phase4 };
     }
 
     /**
@@ -1449,7 +1583,7 @@ export default class SquanLib {
             let sliceStart = ' ';
 
             // Pre-unkarnify so rateAlg always receives a numeric string.
-            const numericAlg = this.isKarn(algOnly) ? this.unkarnify(algOnly) : algOnly;
+            const numericAlg = this.unkarnify(algOnly);
             ({ score: result.score, sliceStart } = this.rateAlg(numericAlg, initialTopA));
             rated = true;
 
@@ -1545,38 +1679,16 @@ export default class SquanLib {
         let alg = algIn
             .replace(/\[.*?\]/g, "")
             .replace(/[()]/g, "").trim();
-        if (this.isKarn(alg)) {
-            const numeric = this.unkarnify(alg);
-            return numeric.split("/").map(m => {
-                if (!m) return m;
-                if (!m.includes(","))
-                    throw new Error(
-                        `algToInternal: m doesn't have commas post karnifying: ${m}`
-                    )
-                const [u, d] = m.split(",");
-                return String(this.legalMove(parseInt(u, 10))) +
-                    String(this.legalMove(parseInt(d, 10)));
-            }).join(" ");
-        }
-        alg = alg.replaceAll(" ", "");
-        if (alg.includes("/")) {
-            return alg.split("/").filter(Boolean).map(m => {
-                if (!m.includes(",")) m = this.addCommas(m);
-                if (!m.includes(","))
-                    throw new Error(
-                        `algToInternal: m doesn't have commas post addComma: ${m}`
-                    )
-                const [u, d] = m.split(",");
-                return String(this.legalMove(parseInt(u, 10))) +
-                    String(this.legalMove(parseInt(d, 10)));
-            }).join(" ");
-        }
-        return alg.split(" ").filter(p => p).map(m => {
-            const p = m.includes(",")
-                ? m.split(",")
-                : [m.slice(0, this.sepIndex(m)), m.slice(this.sepIndex(m))];
-            return String(this.legalMove(parseInt(p[0], 10))) +
-                String(this.legalMove(parseInt(p[1], 10)));
+        alg = this.unkarnify(alg);
+        return alg.split("/").filter(Boolean).map(m => {
+            if (!m.includes(",")) m = this.addCommas(m);
+            if (!m.includes(","))
+                throw new Error(
+                    `algToInternal: m doesn't have commas post addComma: ${m}`
+                )
+            const [u, d] = m.split(",");
+            return String(this.legalMove(parseInt(u, 10))) +
+                String(this.legalMove(parseInt(d, 10)));
         }).join(" ");
     }
 
@@ -1587,59 +1699,69 @@ export default class SquanLib {
      * @returns {number} how many positions the alg can y2 at
      */
     countY2Positions(algIn) {
-        // spaces ARE slices, cannot trim or do anything like that
-        const segs = this.compact(algIn).split(" ");
-        return Math.max(0, segs.length - 3);
+        const segs = this.unkarnify(algIn).split("/");
+        return Math.max(0, segs.length - 2);
     }
 
     /**
      * applyY2s: y2 an alg at a list of specified slices, and give comments
      *
      * @param {string} algIn the alg
-     * @param {number[]} lfLst the list of slice positions to y2 at
+     * @param {number[]} lfLst list of slice positions to y2 (layer flip) at. from 0 to slicecount - 1.
      * @param {boolean} k whether to output as karn, leave to use input format
      * @returns {string} the y2'ed alg, plus comments
      */
     applyY2s(algIn, lfLst, k = null) {
         let alg = algIn.replaceAll(/\[.*?\]/g, "").trim();
         if (!lfLst) lfLst = [];
+        lfLst = lfLst.sort();
 
-        const ki = this.isKarn(alg);
+        const ki = /[b-z]/i.test(alg);
         const kOut = k === null ? ki : k;
 
         alg = this.unkarnify(algIn);
         let alst = alg.split("/");
 
-        // save for alignment-changes check
-        const firstMove = alst[0];
-        const lastMove = alst[alst.length - 1];
+        /*
+         * resolve all unresolved y2
+         * guarantee that lfing and facingD are both false by the end, by choosing whether:
+         *   1. to introduce both -2 and -1 to lfLst (net result: lfing, !facingD)
+         *   2. to introduce either -2 or -1 (net: !lfing). choose the one that makes facingD false.
+         */
+        if (lfLst.length > 0) {
+            // remove the two things we are about to manipulate first
+            lfLst = lfLst.filter(s => ![alst.length - 2, alst.length - 1].includes(s));
+            const unresolved = lfLst.length % 2 === 1;
+            const evenLfLst = unresolved ? lfLst.slice(0, -1) : lfLst;
+            // this is the equivalent of facingD at the very end.
+            // the pairwise difference for [a,b,c,d] is b-a+d-c = -a-c+b+d
+            const oddOff = evenLfLst.reduce((sum, sNum, i) => sum + (-1)**(i-1) * sNum, 0) % 2;
+            if (!unresolved && oddOff) lfLst.push(alst.length - 2, alst.length - 1);
+            else if (unresolved) {
+                const alstOffset = (alst.length - 1 - lfLst.at(-1) + oddOff) % 2 + 1;
+                lfLst.push(alst.length - alstOffset);
+            }
 
-        // Apply explicit y2s to interior moves
-        let lfing = false, facingD = false;
-        for (let i = 1; i <= alst.length - 3; i++) {
-            let m = alst[i];
-            m = facingD ? this.lf(m) : m;
-            if (lfLst.includes(i)) { m = this.compl(m); lfing = !lfing; }
-            facingD = lfing ? !facingD : facingD;
-            alst[i] = m;
+            // Apply explicit y2s
+            let lfing = false, facingD = false;
+            for (let i = 0; i <= alst.length - 1; i++) {
+                let m = alst[i];
+                m = facingD ? this.lf(m) : m;
+                if (lfLst.includes(i)) { m = this.compl(m); lfing = !lfing; }
+                facingD = lfing ? !facingD : facingD;
+                alst[i] = m;
+            }
+
+            if (lfing || facingD) throw new Error("applyY2s: Resolving unresolved y2s failed!");
         }
 
-        // fix last interior move
-        const lastIntIdx = alst.length - 2;
-        if (facingD) alst[lastIntIdx] = this.lf(alst[lastIntIdx]);
-        if (lfing !== facingD) alst[lastIntIdx] = this.compl(alst[lastIntIdx]);
-        const lastIntMove = alst[lastIntIdx];
-
-        // add commas to all moves
-        for (let i = 0; i < alst.length; i++) alst[i] = this.addCommas(alst[i]);
         alg = alst.join('/');
 
         // build comment
         let comment = "";
-        if (lastIntMove && !SquanLib.GOOD_FINISHES.has(lastIntMove))
-            comment += ' (bad finish)';
-        const { topA: topAstart, bottomA: bottomAstart } = this.getAlignment(firstMove);
-        const { topA: topAend, bottomA: bottomAend } = this.getAlignment(lastMove);
+        if (!SquanLib.GOOD_FINISHES.has(alst.at(-2))) comment += ' (bad finish)';
+        const { topA: topAstart, bottomA: bottomAstart } = this.getAlignment(alst[0]);
+        const { topA: topAend, bottomA: bottomAend } = this.getAlignment(alst.at(-1));
         if (topAstart !== bottomAstart &&
             topAstart !== topAend &&
             topAend !== bottomAend)
@@ -1835,8 +1957,8 @@ export default class SquanLib {
     getAngle(u, d, au, ad) {
         let uAngle = SquanLib.OBL_ANGLES[u];
         let dAngle = SquanLib.OBL_ANGLES[d];
-        for (let i = 0; i < au % 4; i++) uAngle = SquanLib.nextAngle[uAngle];
-        for (let i = 0; i < ad % 4; i++) dAngle = SquanLib.nextAngle[dAngle];
+        for (let i = 0; i < au % 4; i++) uAngle = SquanLib.nextAngleOBL[uAngle];
+        for (let i = 0; i < ad % 4; i++) dAngle = SquanLib.nextAngleOBL[dAngle];
         return `${uAngle} ${dAngle}`;
     }
 
