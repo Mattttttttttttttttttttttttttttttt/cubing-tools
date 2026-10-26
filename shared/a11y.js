@@ -13,7 +13,7 @@ const NO_RING = `:is(${TEXT_FIELD}),[tabindex="-1"]`;
 const css = `
 html:not([data-kbnav]) :focus:not(:is(${TEXT_FIELD})) { outline: none; }
 html[data-kbnav] :focus:not(${NO_RING}) {
-  outline: 2px solid var(--tool-color, var(--accent, #ff85a1));
+  outline: 2px solid var(--accent, #ff85a1);
   outline-offset: 2px;
 }`;
 const style = document.createElement('style');
@@ -61,7 +61,7 @@ window.addEventListener('keydown', e => {
     if (top) {            // Esc closes the modal: no ring
       e.preventDefault();
       e.stopPropagation();
-      top.close();
+      if (!top.onEscape?.()) { top.close(); setKbNav(false); }
       return;
     }
     // Esc with no modal: ring unless another handler consumed it.
@@ -84,7 +84,7 @@ document.addEventListener('focusin', e => {
  *   close: called on Esc; must call release().
  * @returns {{activate: () => void, release: () => void}}
  */
-export function trapModal(root, { close, initialFocus } = {}) {
+export function trapModal(root, { close, initialFocus, onEscape } = {}) {
   root.tabIndex = -1;
   root.inert = true; // closed modals must not be tabbable
   let opener = null;
@@ -92,6 +92,7 @@ export function trapModal(root, { close, initialFocus } = {}) {
   const entry = {
     root,
     close,
+    onEscape,
     focusInside() {
       const target = typeof initialFocus === 'function' ? initialFocus() : initialFocus;
       (target || focusables(root)[0] || root).focus({ preventScroll: true });

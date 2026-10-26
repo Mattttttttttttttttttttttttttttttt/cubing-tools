@@ -45,7 +45,7 @@
     .solve-entry { display: flex; flex-direction: column; gap: 3px; }
     .solve-error {
       font-family: var(--font-mono); font-size: 0.65rem;
-      color: #d86074; margin-top: 5px;
+      color: #d86074; padding-left: 52px;
       display: none; align-items: center; gap: 5px;
     }
     .solve-error::before {
@@ -75,6 +75,7 @@
       cursor: pointer; font-size: 1rem; padding: 2px 6px;
       line-height: 1; flex-shrink: 0;
       transition: color 0.12s;
+      aspect-ratio: 1; border-radius: 50%;
     }
     .remove-btn:hover { color: #c41e3a; }
     .remove-btn.hidden { visibility: hidden; pointer-events: none; }
@@ -172,6 +173,7 @@
 
 <script type="module">
 import { buildNav } from '../shared/nav.js';
+import { attachTimeInput } from '../shared/timeinput.js';
 buildNav('mean');
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -323,6 +325,7 @@ function createEntryEl(idx) {
   field.className = 'solve-field';
   field.placeholder = '0:00.00';
   applyFieldDisplay(field, s);
+  attachTimeInput(field);
   fieldWrap.appendChild(field);
 
   field.addEventListener('input', () => {
@@ -474,9 +477,7 @@ function createEntryEl(idx) {
 
   const errLine = document.createElement('div');
   errLine.className = 'solve-error';
-  fieldWrap.appendChild(errLine);
-
-  entry.append(row);
+  entry.append(row, errLine);
   return entry;
 }
 

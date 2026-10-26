@@ -210,7 +210,10 @@ body {
     color: var(--text-muted);
     background: none;
     cursor: pointer;
-    padding: 5px 11px;
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 11px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     transition: color 0.12s, border-color 0.12s;
@@ -438,6 +441,225 @@ body {
     .modal-content {
         padding: 28px 24px 20px;
     }
+}
+
+/* ── NAV ACTIONS (settings + about) ── */
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.nav-settings {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 26px;
+    color: var(--text-muted);
+    background: none;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: color 0.12s, border-color 0.12s;
+}
+
+.nav-settings svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-settings:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.nav-settings:hover svg {
+    transform: rotate(60deg);
+}
+
+/* ── SETTINGS MODAL ── */
+.modal.modal-settings {
+    max-width: 480px;
+    overflow: visible; /* dropdown list may extend past the card */
+}
+
+.settings-body {
+    padding: 32px 32px 30px;
+}
+
+.settings-body .modal-title {
+    font-size: 1.6rem;
+    margin-bottom: 14px;
+}
+
+.settings-section {
+    margin-top: 26px;
+}
+
+.settings-heading {
+    font-family: var(--font-ui);
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding-top: 16px;
+}
+
+.setting-info {
+    min-width: 0;
+}
+
+.setting-label {
+    font-size: 1.02rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.setting-desc {
+    margin-top: 3px;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+@media (max-width: 520px) {
+    .settings-body {
+        padding: 28px 22px 24px;
+    }
+
+    .setting-row {
+        gap: 14px;
+    }
+}
+
+/* ── CUSTOM DROPDOWN ── */
+.dd {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.dd-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 78px;
+    height: 34px;
+    padding: 0 10px 0 12px;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border-2);
+    border-radius: 7px;
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+}
+
+.dd-btn:hover {
+    border-color: var(--text-muted);
+}
+
+.dd.open .dd-btn {
+    border-color: var(--accent);
+}
+
+.dd-chev {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: transform 0.18s ease, color 0.12s;
+}
+
+.dd.open .dd-chev {
+    color: var(--accent);
+    transform: rotate(180deg);
+}
+
+.dd-list {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 100%;
+    z-index: 5;
+    list-style: none;
+    padding: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    border-radius: 9px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px) scale(0.98);
+    transform-origin: top right;
+    transition: opacity 0.14s ease, transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.16s;
+}
+
+.dd.open .dd-list {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
+}
+
+.dd.up .dd-list {
+    top: auto;
+    bottom: calc(100% + 6px);
+    transform: translateY(4px) scale(0.98);
+    transform-origin: bottom right;
+}
+
+.dd.up.open .dd-list {
+    transform: none;
+}
+
+.dd-opt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+}
+
+.dd-opt.active {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--text);
+}
+
+.dd-opt.sel {
+    color: var(--accent);
+}
+
+.dd-opt.sel::after {
+    content: '';
+    width: 5px;
+    height: 9px;
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
 }
 
 /* ── LINK POPOVER ── */
@@ -743,6 +965,7 @@ select {
     align-items: center;
     gap: 7px;
     min-width: 0;
+    padding-right: 4px;
 }
 
 /* Let the input wrapper shrink so a long value scrolls inside the input
